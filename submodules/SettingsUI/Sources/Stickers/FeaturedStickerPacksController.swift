@@ -138,17 +138,7 @@ private func featuredStickerPacksControllerEntries(presentationData: Presentatio
                 if let value = unreadPacks[item.info.id] {
                     unread = value
                 }
-                
-                let countTitle: String
-                if item.info.id.namespace == Namespaces.ItemCollection.CloudEmojiPacks {
-                    countTitle = presentationData.strings.StickerPack_EmojiCount(item.info.count)
-                } else if item.info.id.namespace == Namespaces.ItemCollection.CloudMaskPacks {
-                    countTitle = presentationData.strings.StickerPack_MaskCount(item.info.count)
-                } else {
-                    countTitle = presentationData.strings.StickerPack_StickerCount(item.info.count)
-                }
-                
-                entries.append(.pack(index, presentationData.theme, presentationData.strings, item.info, unread, item.topItems.first, countTitle, stickerSettings.loopAnimatedStickers, installedPacks.contains(item.info.id)))
+                entries.append(.pack(index, presentationData.theme, presentationData.strings, item.info, unread, item.topItems.first, presentationData.strings.StickerPack_StickerCount(item.info.count), stickerSettings.loopAnimatedStickers, installedPacks.contains(item.info.id)))
                 index += 1
             }
         }

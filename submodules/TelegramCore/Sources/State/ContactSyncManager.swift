@@ -249,7 +249,7 @@ private func pushDeviceContacts(postbox: Postbox, network: Network, importableCo
                         if let updatedData = importableContacts[number] {
                             if let value = value as? TelegramDeviceContactImportedData {
                                 switch value {
-                                    case let .imported(data, _, _):
+                                    case let .imported(data, _):
                                         if data != updatedData {
                                            updatedDataIdentifiers.insert(identifier)
                                         }
@@ -289,10 +289,7 @@ private func pushDeviceContacts(postbox: Postbox, network: Network, importableCo
         outer: for i in (0 ..< orderedPushIdentifiers.count).reversed() {
             if let user = currentContactDetails[orderedPushIdentifiers[i]], case let .phoneNumber(number) = orderedPushIdentifiers[i], let data = importableContacts[number] {
                 if (user.firstName ?? "") == data.firstName && (user.lastName ?? "") == data.lastName {
-                    if data.localIdentifiers.contains("5DFF1D6F-8C0A-48C9-800D-F4BEC59C0E50") {
-                        assert(true)
-                    }
-                    transaction.setDeviceContactImportInfo(orderedPushIdentifiers[i].key, value: TelegramDeviceContactImportedData.imported(data: data, importedByCount: 0, peerId: user.id))
+                    transaction.setDeviceContactImportInfo(orderedPushIdentifiers[i].key, value: TelegramDeviceContactImportedData.imported(data: data, importedByCount: 0))
                     orderedPushIdentifiers.remove(at: i)
                     continue outer
                 }
@@ -337,7 +334,6 @@ private func pushDeviceContactData(postbox: Postbox, network: Network, contacts:
                         var addedContactPeerIds = Set<PeerId>()
                         var retryIndices = Set<Int>()
                         var importedCounts: [Int: Int32] = [:]
-                        var peerIdByClientId: [Int64: PeerId] = [:]
                         switch result {
                             case let .importedContacts(imported, popularInvites, retryContacts, users):
                                 let peers = users.map { TelegramUser(user: $0) as Peer }
@@ -346,10 +342,8 @@ private func pushDeviceContactData(postbox: Postbox, network: Network, contacts:
                                 })
                                 for item in imported {
                                     switch item {
-                                    case let .importedContact(userId, clientId):
-                                        let peerId = PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(userId))
-                                        addedContactPeerIds.insert(peerId)
-                                        peerIdByClientId[clientId] = peerId
+                                        case let .importedContact(userId, _):
+                                            addedContactPeerIds.insert(PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(userId)))
                                     }
                                 }
                                 for item in retryContacts {
@@ -369,10 +363,7 @@ private func pushDeviceContactData(postbox: Postbox, network: Network, contacts:
                                 importedData = .retryLater
                                 addedReimportAttempts[.phoneNumber(batch[i].0)] = timestamp
                             } else {
-                                if batch[i].1.localIdentifiers.contains("5DFF1D6F-8C0A-48C9-800D-F4BEC59C0E50") {
-                                    assert(true)
-                                }
-                                importedData = .imported(data: batch[i].1, importedByCount: importedCounts[i] ?? 0, peerId: peerIdByClientId[Int64(i)])
+                                importedData = .imported(data: batch[i].1, importedByCount: importedCounts[i] ?? 0)
                             }
                             transaction.setDeviceContactImportInfo(TelegramDeviceContactImportIdentifier.phoneNumber(batch[i].0).key, value: importedData)
                         }
@@ -409,7 +400,7 @@ private func updateContactPresences(postbox: Postbox, network: Network, accountP
                         peerPresences[PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(userId))] = TelegramUserPresence(apiStatus: status)
                 }
             }
-            updatePeerPresencesClean(transaction: transaction, accountPeerId: accountPeerId, peerPresences: peerPresences)
+            updatePeerPresences(transaction: transaction, accountPeerId: accountPeerId, peerPresences: peerPresences)
         }
         |> ignoreValues
     }

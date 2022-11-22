@@ -99,7 +99,6 @@ private final class NavigationButtonItemNode: ImmediateTextNode {
                     self.addSubnode(node)
                     self.invalidateCalculatedLayout()
                     self.setNeedsLayout()
-                    self.updatePointerInteraction()
                 }
             }
         }
@@ -211,7 +210,7 @@ private final class NavigationButtonItemNode: ImmediateTextNode {
         if self.node != nil {
             pointerStyle = .lift
         } else {
-            pointerStyle = .insetRectangle(-8.0, 2.0)
+            pointerStyle = .default
         }
         self.pointerInteraction = PointerInteraction(node: self, style: pointerStyle)
     }

@@ -3,15 +3,7 @@ import Foundation
 struct MessageHistoryIndexHoleOperationKey: Hashable {
     let peerId: PeerId
     let namespace: MessageId.Namespace
-    let threadId: Int64?
     let space: MessageHistoryHoleSpace
-    
-    init(peerId: PeerId, namespace: MessageId.Namespace, threadId: Int64?, space: MessageHistoryHoleSpace) {
-        self.peerId = peerId
-        self.namespace = namespace
-        self.threadId = threadId
-        self.space = space
-    }
 }
 
 enum MessageHistoryIndexHoleOperation {
@@ -33,8 +25,8 @@ public enum MessageHistoryHoleSpace: Equatable, Hashable, CustomStringConvertibl
     }
 }
 
-func addMessageHistoryHoleOperation(_ operation: MessageHistoryIndexHoleOperation, peerId: PeerId, threadId: Int64?, namespace: MessageId.Namespace, space: MessageHistoryHoleSpace, to operations: inout [MessageHistoryIndexHoleOperationKey: [MessageHistoryIndexHoleOperation]]) {
-    let key = MessageHistoryIndexHoleOperationKey(peerId: peerId, namespace: namespace, threadId: threadId, space: space)
+private func addOperation(_ operation: MessageHistoryIndexHoleOperation, peerId: PeerId, namespace: MessageId.Namespace, space: MessageHistoryHoleSpace, to operations: inout [MessageHistoryIndexHoleOperationKey: [MessageHistoryIndexHoleOperation]]) {
+    let key = MessageHistoryIndexHoleOperationKey(peerId: peerId, namespace: namespace, space: space)
     if operations[key] == nil {
         operations[key] = []
     }
@@ -373,7 +365,7 @@ final class MessageHistoryHoleIndexTable: Table {
             self.valueBox.set(self.table, key: self.key(id: MessageId(peerId: peerId, namespace: namespace, id: closedRange.upperBound), space: space), value: MemoryBuffer(memory: &lowerBound, capacity: 4, length: 4, freeWhenDone: false))
         }
         
-        addMessageHistoryHoleOperation(.insert(clippedRange), peerId: peerId, threadId: nil, namespace: namespace, space: space, to: &operations)
+        addOperation(.insert(clippedRange), peerId: peerId, namespace: namespace, space: space, to: &operations)
     }
     
     func remove(peerId: PeerId, namespace: MessageId.Namespace, space: MessageHistoryHoleSpace, range: ClosedRange<MessageId.Id>, operations: inout [MessageHistoryIndexHoleOperationKey: [MessageHistoryIndexHoleOperation]]) {
@@ -439,7 +431,7 @@ final class MessageHistoryHoleIndexTable: Table {
         }
         
         if !removeKeys.isEmpty {
-            addMessageHistoryHoleOperation(.remove(range), peerId: peerId, threadId: nil, namespace: namespace, space: space, to: &operations)
+            addOperation(.remove(range), peerId: peerId, namespace: namespace, space: space, to: &operations)
         }
     }
     

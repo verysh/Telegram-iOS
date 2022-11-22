@@ -36,7 +36,6 @@ swift_library(
         "//submodules/TelegramCore:TelegramCore",
         "//submodules/AnimationCompression:AnimationCompression",
         "//submodules/Components/MetalImageView:MetalImageView",
-        "//submodules/WebPBinding:WebPBinding",
     ],
     visibility = [
         "//visibility:public",

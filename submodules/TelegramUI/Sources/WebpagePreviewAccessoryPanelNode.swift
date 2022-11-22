@@ -135,14 +135,14 @@ final class WebpagePreviewAccessoryPanelNode: AccessoryPanelNode {
                         } else if content.type == "telegram_theme" {
                             text = strings.Message_Theme
                         } else {
-                            text = stringForMediaKind(mediaKind, strings: self.strings).0.string
+                            text = stringForMediaKind(mediaKind, strings: self.strings).0
                         }
                     } else if content.type == "telegram_theme" {
                         text = strings.Message_Theme
                     } else if content.type == "video" {
-                        text = stringForMediaKind(.video, strings: self.strings).0.string
+                        text = stringForMediaKind(.video, strings: self.strings).0
                     } else if let _ = content.image {
-                        text = stringForMediaKind(.image, strings: self.strings).0.string
+                        text = stringForMediaKind(.image, strings: self.strings).0
                     }
                 }
                 

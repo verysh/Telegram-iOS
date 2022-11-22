@@ -420,7 +420,7 @@ public func chatTextLinkEditController(sharedContext: SharedAccountContext, upda
         controller?.theme = AlertControllerTheme(presentationData: presentationData)
         contentNode?.inputFieldNode.updateTheme(presentationData.theme)
     })
-    controller.dismissed = { _ in
+    controller.dismissed = {
         presentationDataDisposable.dispose()
     }
     dismissImpl = { [weak controller] animated in

@@ -586,9 +586,6 @@ open class ListViewItemNode: ASDisplayNode, AccessibilityFocusableNode {
     open func selected() {
     }
     
-    open func secondaryAction(at point: CGPoint) {
-    }
-    
     open func isReorderable(at point: CGPoint) -> Bool {
         return false
     }

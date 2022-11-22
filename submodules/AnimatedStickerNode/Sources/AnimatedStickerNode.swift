@@ -156,7 +156,6 @@ public protocol AnimatedStickerNode: ASDisplayNode {
     var completed: (Bool) -> Void { get set }
     var frameUpdated: (Int, Int) -> Void { get set }
     var currentFrameIndex: Int { get }
-    var currentFrameImage: UIImage? { get }
     var currentFrameCount: Int { get }
     var isPlaying: Bool { get }
     var stopAtNearestLoop: Bool { get set }
@@ -166,7 +165,6 @@ public protocol AnimatedStickerNode: ASDisplayNode {
     var autoplay: Bool { get set }
     
     var visibility: Bool { get set }
-    var overrideVisibility: Bool { get set }
     
     var isPlayingChanged: (Bool) -> Void { get }
     
@@ -174,7 +172,6 @@ public protocol AnimatedStickerNode: ASDisplayNode {
     func setup(source: AnimatedStickerNodeSource, width: Int, height: Int, playbackMode: AnimatedStickerPlaybackMode, mode: AnimatedStickerMode)
     func reset()
     func playOnce()
-    func playLoop()
     func play(firstFrame: Bool, fromIndex: Int?)
     func pause()
     func stop()
@@ -225,11 +222,6 @@ public final class DefaultAnimatedStickerNodeImpl: ASDisplayNode, AnimatedSticke
     }
     
     public var autoplay = false
-    public var overrideVisibility: Bool = false
-    
-    public var currentFrameImage: UIImage? {
-        return self.renderer?.renderer.currentFrameImage
-    }
     
     public var visibility = false {
         didSet {
@@ -394,7 +386,7 @@ public final class DefaultAnimatedStickerNodeImpl: ASDisplayNode, AnimatedSticke
     
     private func updateIsPlaying() {
         if !self.autoplay {
-            let isPlaying = self.visibility && (self.isDisplaying || self.overrideVisibility)
+            let isPlaying = self.visibility && self.isDisplaying
             if self.isPlaying != isPlaying {
                 self.isPlaying = isPlaying
                 if isPlaying {
@@ -425,11 +417,6 @@ public final class DefaultAnimatedStickerNodeImpl: ASDisplayNode, AnimatedSticke
     
     public func playOnce() {
         self.playbackMode = .once
-        self.play()
-    }
-    
-    public func playLoop() {
-        self.playbackMode = .loop
         self.play()
     }
         
@@ -489,7 +476,7 @@ public final class DefaultAnimatedStickerNodeImpl: ASDisplayNode, AnimatedSticke
                 let duration: Double = frameSource.frameRate > 0 ? Double(frameSource.frameCount) / Double(frameSource.frameRate) : 0
                 let frameRate = frameSource.frameRate
                 
-                let timerEvent: () -> Void = {
+                let timer = SwiftSignalKit.Timer(timeout: 1.0 / Double(frameRate), repeat: !firstFrame, completion: {
                     let frame = frameQueue.syncWith { frameQueue in
                         return frameQueue.take(draw: true)
                     }
@@ -544,13 +531,8 @@ public final class DefaultAnimatedStickerNodeImpl: ASDisplayNode, AnimatedSticke
                     frameQueue.with { frameQueue in
                         frameQueue.generateFramesIfNeeded()
                     }
-                }
-                
-                let timer = SwiftSignalKit.Timer(timeout: 1.0 / Double(frameRate), repeat: !firstFrame, completion: {
-                    timerEvent()
                 }, queue: queue)
                 let _ = timerHolder.swap(timer)
-                timerEvent()
                 timer.start()
             }
         } else {

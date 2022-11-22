@@ -15,11 +15,11 @@ class ChatListRecentPeersListItem: ListViewItem {
     let context: AccountContext
     let peers: [EnginePeer]
     let peerSelected: (EnginePeer) -> Void
-    let peerContextAction: (EnginePeer, ASDisplayNode, ContextGesture?, CGPoint?) -> Void
+    let peerContextAction: (EnginePeer, ASDisplayNode, ContextGesture?) -> Void
     
     let header: ListViewItemHeader?
     
-    init(theme: PresentationTheme, strings: PresentationStrings, context: AccountContext, peers: [EnginePeer], peerSelected: @escaping (EnginePeer) -> Void, peerContextAction: @escaping (EnginePeer, ASDisplayNode, ContextGesture?, CGPoint?) -> Void) {
+    init(theme: PresentationTheme, strings: PresentationStrings, context: AccountContext, peers: [EnginePeer], peerSelected: @escaping (EnginePeer) -> Void, peerContextAction: @escaping (EnginePeer, ASDisplayNode, ContextGesture?) -> Void) {
         self.theme = theme
         self.strings = strings
         self.context = context
@@ -122,8 +122,8 @@ class ChatListRecentPeersListItemNode: ListViewItemNode {
                     } else {
                         peersNode = ChatListSearchRecentPeersNode(context: item.context, theme: item.theme, mode: .list(compact: false), strings: item.strings, peerSelected: { peer in
                             self?.item?.peerSelected(peer)
-                        }, peerContextAction: { peer, node, gesture, location in
-                            self?.item?.peerContextAction(peer, node, gesture, location)
+                        }, peerContextAction: { peer, node, gesture in
+                            self?.item?.peerContextAction(peer, node, gesture)
                         }, isPeerSelected: { _ in
                             return false
                         })

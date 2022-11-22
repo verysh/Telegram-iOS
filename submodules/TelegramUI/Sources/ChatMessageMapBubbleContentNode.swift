@@ -64,7 +64,7 @@ class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
         self.view.addGestureRecognizer(tapRecognizer)
     }
     
-    override func asyncLayoutContent() -> (_ item: ChatMessageBubbleContentItem, _ layoutConstants: ChatMessageItemLayoutConstants, _ preparePosition: ChatMessageBubblePreparePosition, _ messageSelection: Bool?, _ constrainedSize: CGSize, _ avatarInset: CGFloat) -> (ChatMessageBubbleContentProperties, CGSize?, CGFloat, (CGSize, ChatMessageBubbleContentPosition) -> (CGFloat, (CGFloat) -> (CGSize, (ListViewItemUpdateAnimation, Bool, ListViewItemApply?) -> Void))) {
+    override func asyncLayoutContent() -> (_ item: ChatMessageBubbleContentItem, _ layoutConstants: ChatMessageItemLayoutConstants, _ preparePosition: ChatMessageBubblePreparePosition, _ messageSelection: Bool?, _ constrainedSize: CGSize) -> (ChatMessageBubbleContentProperties, CGSize?, CGFloat, (CGSize, ChatMessageBubbleContentPosition) -> (CGFloat, (CGFloat) -> (CGSize, (ListViewItemUpdateAnimation, Bool, ListViewItemApply?) -> Void))) {
         let makeImageLayout = self.imageNode.asyncLayout()
         let makePinLayout = self.pinNode.asyncLayout()
         let statusLayout = self.dateAndStatusNode.asyncLayout()
@@ -73,7 +73,7 @@ class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
         
         let previousMedia = self.media
         
-        return { item, layoutConstants, preparePosition, _, constrainedSize, _ in
+        return { item, layoutConstants, preparePosition, _, constrainedSize in
             var selectedMedia: TelegramMediaMap?
             var activeLiveBroadcastingTimeout: Int32?
             for media in item.message.media {
@@ -183,10 +183,7 @@ class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
                 }
                 var viewCount: Int?
                 var dateReplies = 0
-                var dateReactionsAndPeers = mergedMessageReactionsAndPeers(accountPeer: item.associatedData.accountPeer, message: item.message)
-                if item.message.isRestricted(platform: "ios", contentSettings: item.context.currentContentSettings.with { $0 }) {
-                    dateReactionsAndPeers = ([], [])
-                }
+                let dateReactionsAndPeers = mergedMessageReactionsAndPeers(message: item.message)
                 for attribute in item.message.attributes {
                     if let attribute = attribute as? EditedMessageAttribute {
                         edited = !attribute.isHidden
@@ -255,18 +252,15 @@ class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
                         impressionCount: viewCount,
                         dateText: dateText,
                         type: statusType,
-                        layoutInput: .standalone(reactionSettings: shouldDisplayInlineDateReactions(message: item.message, isPremium: item.associatedData.isPremium, forceInline: item.associatedData.forceInlineReactions) ? ChatMessageDateAndStatusNode.StandaloneReactionSettings() : nil),
+                        layoutInput: .standalone(reactionSettings: shouldDisplayInlineDateReactions(message: item.message) ? ChatMessageDateAndStatusNode.StandaloneReactionSettings() : nil),
                         constrainedSize: CGSize(width: constrainedSize.width, height: CGFloat.greatestFiniteMagnitude),
                         availableReactions: item.associatedData.availableReactions,
                         reactions: dateReactionsAndPeers.reactions,
                         reactionPeers: dateReactionsAndPeers.peers,
-                        displayAllReactionPeers: item.message.id.peerId.namespace == Namespaces.Peer.CloudUser,
                         replyCount: dateReplies,
                         isPinned: item.message.tags.contains(.pinned) && !item.associatedData.isInPinnedListMode && !isReplyThread,
                         hasAutoremove: item.message.isSelfExpiring,
-                        canViewReactionList: canViewMessageReactionList(message: item.message),
-                        animationCache: item.controllerInteraction.presentationContext.animationCache,
-                        animationRenderer: item.controllerInteraction.presentationContext.animationRenderer
+                        canViewReactionList: canViewMessageReactionList(message: item.message)
                     ))
                     
                     let (dateAndStatusSize, dateAndStatusApply) = statusSuggestedWidthAndContinue.1(statusSuggestedWidthAndContinue.0)
@@ -409,7 +403,7 @@ class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
                                         if let strongSelf = self {
                                             strongSelf.timeoutTimer?.0.invalidate()
                                             strongSelf.timeoutTimer = nil
-                                            item.controllerInteraction.requestMessageUpdate(item.message.id, false)
+                                            item.controllerInteraction.requestMessageUpdate(item.message.id)
                                         }
                                     }, queue: Queue.mainQueue())
                                     strongSelf.timeoutTimer = (timer, timeoutDeadline)
@@ -508,7 +502,7 @@ class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
         }
     }
     
-    override func reactionTargetView(value: MessageReaction.Reaction) -> UIView? {
+    override func reactionTargetView(value: String) -> UIView? {
         if !self.dateAndStatusNode.isHidden {
             return self.dateAndStatusNode.reactionView(value: value)
         }

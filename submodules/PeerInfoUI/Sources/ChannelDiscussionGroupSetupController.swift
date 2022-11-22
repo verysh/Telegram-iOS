@@ -15,7 +15,6 @@ import PresentationDataUtils
 import ItemListPeerItem
 import ItemListPeerActionItem
 import ChatListFilterSettingsHeaderItem
-import UndoUI
 
 private final class ChannelDiscussionGroupSetupControllerArguments {
     let context: AccountContext
@@ -315,13 +314,6 @@ public func channelDiscussionGroupSetupController(context: AccountContext, updat
             }
             
             let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-            
-            if case let .channel(channel) = groupPeer, channel.flags.contains(.isForum) {
-                let text = presentationData.strings.PeerInfo_TopicsLimitedDiscussionGroups
-                presentControllerImpl?(UndoOverlayController(presentationData: presentationData, content: .universal(animation: "anim_topics", scale: 0.066, colors: [:], title: nil, text: text, customUndoText: nil), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return false }), nil)
-                return
-            }
-            
             let actionSheet = ActionSheetController(presentationData: presentationData)
             actionSheet.setItemGroups([ActionSheetItemGroup(items: [
                 ChannelDiscussionGroupActionSheetItem(context: context, channelPeer: channelPeer._asPeer(), groupPeer: groupPeer._asPeer(), strings: presentationData.strings, nameDisplayOrder: presentationData.nameDisplayOrder),
@@ -645,17 +637,10 @@ public func channelDiscussionGroupSetupController(context: AccountContext, updat
         controller?.present(c, in: .window(.root), with: a)
     }
     navigateToGroupImpl = { [weak controller] groupId in
-        let _ = (context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: groupId))
-        |> deliverOnMainQueue).start(next: { peer in
-            guard let peer = peer else {
-                return
-            }
-            
-            guard let navigationController = controller?.navigationController as? NavigationController else {
-                return
-            }
-            context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, context: context, chatLocation: .peer(peer), keepStack: .always))
-        })
+        guard let navigationController = controller?.navigationController as? NavigationController else {
+            return
+        }
+        context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, context: context, chatLocation: .peer(id: groupId), keepStack: .always))
     }
     return controller
 }

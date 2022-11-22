@@ -764,7 +764,7 @@ func importStickerPackTitleController(context: AccountContext, title: String, te
     controller.willDismiss = { [weak contentNode] in
         contentNode?.inputFieldNode.deactivateInput()
     }
-    controller.dismissed = { _ in
+    controller.dismissed = {
         presentationDataDisposable.dispose()
     }
     dismissImpl = { [weak controller, weak contentNode] animated in
@@ -854,7 +854,7 @@ func importStickerPackShortNameController(context: AccountContext, title: String
     controller.willDismiss = { [weak contentNode] in
         contentNode?.inputFieldNode.deactivateInput()
     }
-    controller.dismissed = { _ in
+    controller.dismissed = {
         presentationDataDisposable.dispose()
     }
     dismissImpl = { [weak controller, weak contentNode] animated in

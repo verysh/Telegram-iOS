@@ -82,3 +82,9 @@ extension SecretFileMediaResource: TelegramCloudMediaResource, TelegramMultipart
         return .inputEncryptedFileLocation(id: self.fileId, accessHash: self.accessHash)
     }
 }
+
+extension WebFileReferenceMediaResource {
+    var apiInputLocation: Api.InputWebFileLocation {
+        return .inputWebFileLocation(url: self.url, accessHash: self.accessHash)
+    }
+}

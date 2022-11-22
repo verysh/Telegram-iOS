@@ -11,7 +11,6 @@ import TelegramVoip
 import TelegramUIPreferences
 import AccountContext
 import CallKit
-import PhoneNumberFormat
 
 private func callKitIntegrationIfEnabled(_ integration: CallKitIntegration?, settings: VoiceCallSettings?) -> CallKitIntegration?  {
     let enabled = settings?.enableSystemIntegration ?? true
@@ -129,16 +128,16 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
         self.isMediaPlaying = isMediaPlaying
         self.resumeMediaPlayback = resumeMediaPlayback
         
-        var startCallImpl: ((AccountContext, UUID, EnginePeer.Id?, String, Bool) -> Signal<Bool, NoError>)?
+        var startCallImpl: ((AccountContext, UUID, String, Bool) -> Signal<Bool, NoError>)?
         var answerCallImpl: ((UUID) -> Void)?
         var endCallImpl: ((UUID) -> Signal<Bool, NoError>)?
         var setCallMutedImpl: ((UUID, Bool) -> Void)?
         var audioSessionActivationChangedImpl: ((Bool) -> Void)?
         
         self.callKitIntegration = CallKitIntegration.shared
-        self.callKitIntegration?.setup(startCall: { context, uuid, maybePeerId, handle, isVideo in
+        self.callKitIntegration?.setup(startCall: { context, uuid, handle, isVideo in
             if let startCallImpl = startCallImpl {
-                return startCallImpl(context, uuid, maybePeerId, handle, isVideo)
+                return startCallImpl(context, uuid, handle, isVideo)
             } else {
                 return .single(false)
             }
@@ -216,25 +215,15 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
             self?.ringingStatesUpdated(ringingStates, enableCallKit: enableCallKit)
         })
         
-        startCallImpl = { [weak self] context, uuid, maybePeerId, handle, isVideo in
-            guard let strongSelf = self else {
+        startCallImpl = { [weak self] context, uuid, handle, isVideo in
+            if let strongSelf = self, let userId = Int64(handle) {
+                return strongSelf.startCall(context: context, peerId: PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(userId)), isVideo: isVideo, internalId: uuid)
+                |> take(1)
+                |> map { result -> Bool in
+                    return result
+                }
+            } else {
                 return .single(false)
-            }
-            
-            var peerId: PeerId?
-            if let maybePeerId = maybePeerId {
-                peerId = maybePeerId
-            } else if let userId = Int64(handle) {
-                peerId = PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(userId))
-            }
-            guard let peerId = peerId else {
-                return .single(false)
-            }
-            
-            return strongSelf.startCall(context: context, peerId: peerId, isVideo: isVideo, internalId: uuid)
-            |> take(1)
-            |> map { result -> Bool in
-                return result
             }
         }
         
@@ -409,39 +398,19 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
                 |> runOn(Queue.mainQueue())
                 let postbox = context.account.postbox
                 strongSelf.startCallDisposable.set((accessEnabledSignal
-                |> mapToSignal { accessEnabled -> Signal<(Peer?, String?), NoError> in
+                |> mapToSignal { accessEnabled -> Signal<Peer?, NoError> in
                     if !accessEnabled {
-                        return .single((nil, nil))
+                        return .single(nil)
                     }
-                    return postbox.transaction { transaction -> (Peer?, String?) in
-                        var foundLocalId: String?
-                        transaction.enumerateDeviceContactImportInfoItems({ _, value in
-                            if let value = value as? TelegramDeviceContactImportedData {
-                                switch value {
-                                case let .imported(data, _, importedPeerId):
-                                    if importedPeerId == peerId {
-                                        foundLocalId = data.localIdentifiers.first
-                                        return false
-                                    }
-                                default:
-                                    break
-                                }
-                            }
-                            return true
-                        })
-                        
-                        return (transaction.getPeer(peerId), foundLocalId)
-                    }
+                    return postbox.loadedPeerWithId(peerId)
+                    |> take(1)
+                    |> map(Optional.init)
                 }
-                |> deliverOnMainQueue).start(next: { peer, localContactId in
+                |> deliverOnMainQueue).start(next: { peer in
                     guard let strongSelf = self, let peer = peer else {
                         return
                     }
-                    var phoneNumber: String?
-                    if let peer = peer as? TelegramUser, let phone = peer.phone {
-                        phoneNumber = formatPhoneNumber(phone)
-                    }
-                    strongSelf.callKitIntegration?.startCall(context: context, peerId: peerId, phoneNumber: phoneNumber, localContactId: localContactId, isVideo: isVideo, displayTitle: peer.debugDisplayTitle)
+                    strongSelf.callKitIntegration?.startCall(context: context, peerId: peerId, isVideo: isVideo, displayTitle: peer.debugDisplayTitle)
                 }))
             }
             if let currentCall = self.currentCall {

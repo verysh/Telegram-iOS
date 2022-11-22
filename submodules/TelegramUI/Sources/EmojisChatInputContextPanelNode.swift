@@ -10,13 +10,9 @@ import MergeLists
 import AccountContext
 import Emoji
 import ChatPresentationInterfaceState
-import AnimationCache
-import MultiAnimationRenderer
-import TextFormat
 
-private enum EmojisChatInputContextPanelEntryStableId: Hashable, Equatable {
-    case symbol(String)
-    case media(MediaId)
+private struct EmojisChatInputContextPanelEntryStableId: Hashable, Equatable {
+    let symbol: String
 }
 
 private func backgroundCenterImage(_ theme: PresentationTheme) -> UIImage? {
@@ -59,30 +55,25 @@ private struct EmojisChatInputContextPanelEntry: Comparable, Identifiable {
     let theme: PresentationTheme
     let symbol: String
     let text: String
-    let file: TelegramMediaFile?
     
     var stableId: EmojisChatInputContextPanelEntryStableId {
-        if let file = self.file {
-            return .media(file.fileId)
-        } else {
-            return .symbol(self.symbol)
-        }
+        return EmojisChatInputContextPanelEntryStableId(symbol: self.symbol)
     }
     
     func withUpdatedTheme(_ theme: PresentationTheme) -> EmojisChatInputContextPanelEntry {
-        return EmojisChatInputContextPanelEntry(index: self.index, theme: theme, symbol: self.symbol, text: self.text, file: self.file)
+        return EmojisChatInputContextPanelEntry(index: self.index, theme: theme, symbol: self.symbol, text: self.text)
     }
     
     static func ==(lhs: EmojisChatInputContextPanelEntry, rhs: EmojisChatInputContextPanelEntry) -> Bool {
-        return lhs.index == rhs.index && lhs.symbol == rhs.symbol && lhs.text == rhs.text && lhs.theme === rhs.theme && lhs.file?.fileId == rhs.file?.fileId
+        return lhs.index == rhs.index && lhs.symbol == rhs.symbol && lhs.text == rhs.text && lhs.theme === rhs.theme
     }
     
     static func <(lhs: EmojisChatInputContextPanelEntry, rhs: EmojisChatInputContextPanelEntry) -> Bool {
         return lhs.index < rhs.index
     }
     
-    func item(context: AccountContext, animationCache: AnimationCache, animationRenderer: MultiAnimationRenderer, emojiSelected: @escaping (String, TelegramMediaFile?) -> Void) -> ListViewItem {
-        return EmojisChatInputPanelItem(context: context, theme: self.theme, symbol: self.symbol, text: self.text, file: self.file, animationCache: animationCache, animationRenderer: animationRenderer, emojiSelected: emojiSelected)
+    func item(account: Account, emojiSelected: @escaping (String) -> Void) -> ListViewItem {
+        return EmojisChatInputPanelItem(theme: self.theme, symbol: self.symbol, text: self.text, emojiSelected: emojiSelected)
     }
 }
 
@@ -92,12 +83,12 @@ private struct EmojisChatInputContextPanelTransition {
     let updates: [ListViewUpdateItem]
 }
 
-private func preparedTransition(from fromEntries: [EmojisChatInputContextPanelEntry], to toEntries: [EmojisChatInputContextPanelEntry], context: AccountContext, animationCache: AnimationCache, animationRenderer: MultiAnimationRenderer, emojiSelected: @escaping (String, TelegramMediaFile?) -> Void) -> EmojisChatInputContextPanelTransition {
+private func preparedTransition(from fromEntries: [EmojisChatInputContextPanelEntry], to toEntries: [EmojisChatInputContextPanelEntry], account: Account, emojiSelected: @escaping (String) -> Void) -> EmojisChatInputContextPanelTransition {
     let (deleteIndices, indicesAndItems, updateIndices) = mergeListsStableWithUpdates(leftList: fromEntries, rightList: toEntries)
     
     let deletions = deleteIndices.map { ListViewDeleteItem(index: $0, directionHint: nil) }
-    let insertions = indicesAndItems.map { ListViewInsertItem(index: $0.0, previousIndex: $0.2, item: $0.1.item(context: context, animationCache: animationCache, animationRenderer: animationRenderer, emojiSelected: emojiSelected), directionHint: nil) }
-    let updates = updateIndices.map { ListViewUpdateItem(index: $0.0, previousIndex: $0.2, item: $0.1.item(context: context, animationCache: animationCache, animationRenderer: animationRenderer, emojiSelected: emojiSelected), directionHint: nil) }
+    let insertions = indicesAndItems.map { ListViewInsertItem(index: $0.0, previousIndex: $0.2, item: $0.1.item(account: account, emojiSelected: emojiSelected), directionHint: nil) }
+    let updates = updateIndices.map { ListViewUpdateItem(index: $0.0, previousIndex: $0.2, item: $0.1.item(account: account, emojiSelected: emojiSelected), directionHint: nil) }
     
     return EmojisChatInputContextPanelTransition(deletions: deletions, insertions: insertions, updates: updates)
 }
@@ -115,13 +106,7 @@ final class EmojisChatInputContextPanelNode: ChatInputContextPanelNode {
     private var validLayout: (CGSize, CGFloat, CGFloat, CGFloat)?
     private var presentationInterfaceState: ChatPresentationInterfaceState?
     
-    private let animationCache: AnimationCache
-    private let animationRenderer: MultiAnimationRenderer
-    
-    override init(context: AccountContext, theme: PresentationTheme, strings: PresentationStrings, fontSize: PresentationFontSize, chatPresentationContext: ChatPresentationContext) {
-        self.animationCache = chatPresentationContext.animationCache
-        self.animationRenderer = chatPresentationContext.animationRenderer
-        
+    override init(context: AccountContext, theme: PresentationTheme, strings: PresentationStrings, fontSize: PresentationFontSize) {
         self.backgroundNode = ASImageNode()
         self.backgroundNode.displayWithoutProcessing = true
         self.backgroundNode.displaysAsynchronously = false
@@ -149,7 +134,7 @@ final class EmojisChatInputContextPanelNode: ChatInputContextPanelNode {
             return strings.VoiceOver_ScrollStatus(row, count).string
         }
         
-        super.init(context: context, theme: theme, strings: strings, fontSize: fontSize, chatPresentationContext: chatPresentationContext)
+        super.init(context: context, theme: theme, strings: strings, fontSize: fontSize)
         
         self.placement = .overTextInput
         self.isOpaque = false
@@ -162,12 +147,12 @@ final class EmojisChatInputContextPanelNode: ChatInputContextPanelNode {
         self.clippingNode.addSubnode(self.listView)
     }
     
-    func updateResults(_ results: [(String, TelegramMediaFile?, String)]) {
+    func updateResults(_ results: [(String, String)]) {
         var entries: [EmojisChatInputContextPanelEntry] = []
         var index = 0
         var stableIds = Set<EmojisChatInputContextPanelEntryStableId>()
-        for (symbol, file, text) in results {
-            let entry = EmojisChatInputContextPanelEntry(index: index, theme: self.theme, symbol: symbol.normalizedEmoji, text: text, file: file)
+        for (symbol, text) in results {
+            let entry = EmojisChatInputContextPanelEntry(index: index, theme: self.theme, symbol: symbol.normalizedEmoji, text: text)
             if stableIds.contains(entry.stableId) {
                 continue
             }
@@ -180,54 +165,33 @@ final class EmojisChatInputContextPanelNode: ChatInputContextPanelNode {
     
     private func prepareTransition(from: [EmojisChatInputContextPanelEntry]? , to: [EmojisChatInputContextPanelEntry]) {
         let firstTime = self.currentEntries == nil
-        let transition = preparedTransition(from: from ?? [], to: to, context: self.context, animationCache: self.animationCache, animationRenderer: self.animationRenderer, emojiSelected: { [weak self] text, file in
-            guard let strongSelf = self, let interfaceInteraction = strongSelf.interfaceInteraction else {
-                return
-            }
-            
-            var text = text
-            
-            interfaceInteraction.updateTextInputStateAndMode { textInputState, inputMode in
-                var hashtagQueryRange: NSRange?
-                inner: for (range, type, _) in textInputStateContextQueryRangeAndType(textInputState) {
-                    if type == [.emojiSearch] {
-                        var range = range
-                        range.location -= 1
-                        range.length += 1
-                        hashtagQueryRange = range
-                        break inner
-                    }
-                }
-                
-                if let range = hashtagQueryRange {
-                    let inputText = NSMutableAttributedString(attributedString: textInputState.inputText)
-                    
-                    var emojiAttribute: ChatTextInputTextCustomEmojiAttribute?
-                    if let file = file {
-                        loop: for attribute in file.attributes {
-                            switch attribute {
-                            case let .CustomEmoji(_, displayText, _):
-                                text = displayText
-                                emojiAttribute = ChatTextInputTextCustomEmojiAttribute(interactivelySelectedFromPackId: nil, fileId: file.fileId.id, file: file)
-                                break loop
-                            default:
-                                break
-                            }
+        let transition = preparedTransition(from: from ?? [], to: to, account: self.context.account, emojiSelected: { [weak self] text in
+            if let strongSelf = self, let interfaceInteraction = strongSelf.interfaceInteraction {
+                interfaceInteraction.updateTextInputStateAndMode { textInputState, inputMode in
+                    var hashtagQueryRange: NSRange?
+                    inner: for (range, type, _) in textInputStateContextQueryRangeAndType(textInputState) {
+                        if type == [.emojiSearch] {
+                            var range = range
+                            range.location -= 1
+                            range.length += 1
+                            hashtagQueryRange = range
+                            break inner
                         }
                     }
                     
-                    var replacementText = NSAttributedString(string: text)
-                    if let emojiAttribute = emojiAttribute {
-                        replacementText = NSAttributedString(string: text, attributes: [ChatTextInputAttributes.customEmoji: emojiAttribute])
+                    if let range = hashtagQueryRange {
+                        let inputText = NSMutableAttributedString(attributedString: textInputState.inputText)
+                        
+                        let replacementText = text
+                        
+                        inputText.replaceCharacters(in: range, with: replacementText)
+                        
+                        let selectionPosition = range.lowerBound + (replacementText as NSString).length
+                        
+                        return (ChatTextInputState(inputText: inputText, selectionRange: selectionPosition ..< selectionPosition), inputMode)
                     }
-                    
-                    inputText.replaceCharacters(in: range, with: replacementText)
-                    
-                    let selectionPosition = range.lowerBound + (replacementText.string as NSString).length
-                    
-                    return (ChatTextInputState(inputText: inputText, selectionRange: selectionPosition ..< selectionPosition), inputMode)
+                    return (textInputState, inputMode)
                 }
-                return (textInputState, inputMode)
             }
         })
         self.currentEntries = to

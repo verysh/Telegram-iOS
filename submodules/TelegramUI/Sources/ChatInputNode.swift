@@ -11,20 +11,7 @@ class ChatInputNode: ASDisplayNode {
         return .single(Void())
     }
     
-    var externalTopPanelContainer: UIView? {
-        return nil
-    }
-    
-    var topBackgroundExtension: CGFloat = 0.0
-    var topBackgroundExtensionUpdated: ((ContainedViewLayoutTransition) -> Void)?
-    
-    var hideInput: Bool = false
-    var adjustLayoutForHiddenInput: Bool = false
-    var hideInputUpdated: ((ContainedViewLayoutTransition) -> Void)?
-    
-    var followsDefaultHeight: Bool = false
-    
-    func updateLayout(width: CGFloat, leftInset: CGFloat, rightInset: CGFloat, bottomInset: CGFloat, standardInputHeight: CGFloat, inputHeight: CGFloat, maximumHeight: CGFloat, inputPanelHeight: CGFloat, transition: ContainedViewLayoutTransition, interfaceState: ChatPresentationInterfaceState, deviceMetrics: DeviceMetrics, isVisible: Bool, isExpanded: Bool) -> (CGFloat, CGFloat) {
+    func updateLayout(width: CGFloat, leftInset: CGFloat, rightInset: CGFloat, bottomInset: CGFloat, standardInputHeight: CGFloat, inputHeight: CGFloat, maximumHeight: CGFloat, inputPanelHeight: CGFloat, transition: ContainedViewLayoutTransition, interfaceState: ChatPresentationInterfaceState, deviceMetrics: DeviceMetrics, isVisible: Bool) -> (CGFloat, CGFloat) {
         return (0.0, 0.0)
     }
 }

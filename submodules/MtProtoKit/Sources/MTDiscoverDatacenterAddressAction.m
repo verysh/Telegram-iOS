@@ -96,8 +96,6 @@
             _requestService.forceBackgroundRequests = true;
             [_mtProto addMessageService:_requestService];
             
-            [_mtProto resume];
-            
             MTRequest *request = [[MTRequest alloc] init];
             
             NSData *getConfigData = nil;

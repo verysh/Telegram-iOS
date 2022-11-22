@@ -7,7 +7,7 @@ import PackageDescription
 let package = Package(
     name: "OpenSSLEncryption",
     platforms: [
-        .macOS(.v10_12)
+        .macOS(.v10_11)
     ],
     products: [
         .library(

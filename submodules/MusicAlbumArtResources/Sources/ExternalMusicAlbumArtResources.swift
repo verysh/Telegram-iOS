@@ -25,13 +25,11 @@ public struct ExternalMusicAlbumArtResourceId {
 }
 
 public class ExternalMusicAlbumArtResource: Equatable {
-    public let file: FileMediaReference?
     public let title: String
     public let performer: String
     public let isThumbnail: Bool
     
-    public init(file: FileMediaReference?, title: String, performer: String, isThumbnail: Bool) {
-        self.file = file
+    public init(title: String, performer: String, isThumbnail: Bool) {
         self.title = title
         self.performer = performer
         self.isThumbnail = isThumbnail
@@ -42,9 +40,6 @@ public class ExternalMusicAlbumArtResource: Equatable {
     }
 
     public static func ==(lhs: ExternalMusicAlbumArtResource, rhs: ExternalMusicAlbumArtResource) -> Bool {
-        if lhs.file?.media.fileId != rhs.file?.media.fileId {
-            return false
-        }
         if lhs.title != rhs.title {
             return false
         }
@@ -58,10 +53,8 @@ public class ExternalMusicAlbumArtResource: Equatable {
     }
 }
 
-public func fetchExternalMusicAlbumArtResource(engine: TelegramEngine, file: FileMediaReference?, resource: ExternalMusicAlbumArtResource) -> Signal<EngineMediaResource.Fetch.Result, EngineMediaResource.Fetch.Error> {
-    return engine.resources.fetchAlbumCover(file: file, title: resource.title, performer: resource.performer, isThumbnail: resource.isThumbnail)
-    
-    /*return Signal { subscriber in
+public func fetchExternalMusicAlbumArtResource(engine: TelegramEngine, resource: ExternalMusicAlbumArtResource) -> Signal<EngineMediaResource.Fetch.Result, EngineMediaResource.Fetch.Error> {
+    return Signal { subscriber in
         if resource.performer.isEmpty || resource.performer.lowercased().trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) == "unknown artist" || resource.title.isEmpty {
             subscriber.putError(.generic)
             return EmptyDisposable
@@ -158,5 +151,5 @@ public func fetchExternalMusicAlbumArtResource(engine: TelegramEngine, file: Fil
                 fetchDisposable.dispose()
             }
         }
-    }*/
+    }
 }

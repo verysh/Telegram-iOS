@@ -43,7 +43,6 @@ public struct MessageHistoryTagNamespaceSummary: Equatable, CustomStringConverti
 struct MessageHistoryTagsSummaryKey: Equatable, Hashable {
     let tag: MessageTags
     let peerId: PeerId
-    let threadId: Int64?
     let namespace: MessageId.Namespace
 }
 
@@ -81,8 +80,7 @@ class MessageHistoryTagsSummaryTable: Table {
     private var cachedSummaries: [MessageHistoryTagsSummaryKey: CachedEntry] = [:]
     private var updatedKeys = Set<MessageHistoryTagsSummaryKey>()
     
-    private let sharedSimpleKey = ValueBoxKey(length: 4 + 8 + 4)
-    private let sharedThreadKey = ValueBoxKey(length: 4 + 8 + 4 + 8)
+    private let sharedKey = ValueBoxKey(length: 4 + 8 + 4)
     
     init(valueBox: ValueBox, table: ValueBoxTable, useCaches: Bool, invalidateTable: InvalidatedMessageHistoryTagsSummaryTable) {
         self.invalidateTable = invalidateTable
@@ -90,25 +88,17 @@ class MessageHistoryTagsSummaryTable: Table {
         super.init(valueBox: valueBox, table: table, useCaches: useCaches)
     }
     
-    private func keyShared(key: MessageHistoryTagsSummaryKey) -> ValueBoxKey {
-        if let threadId = key.threadId {
-            self.sharedThreadKey.setUInt32(0, value: key.tag.rawValue)
-            self.sharedThreadKey.setInt64(4, value: key.peerId.toInt64())
-            self.sharedThreadKey.setInt32(4 + 8, value: key.namespace)
-            self.sharedThreadKey.setInt64(4 + 8 + 4, value: threadId)
-            return self.sharedThreadKey
-        } else {
-            self.sharedSimpleKey.setUInt32(0, value: key.tag.rawValue)
-            self.sharedSimpleKey.setInt64(4, value: key.peerId.toInt64())
-            self.sharedSimpleKey.setInt32(4 + 8, value: key.namespace)
-            return self.sharedSimpleKey
-        }
+    private func key(key: MessageHistoryTagsSummaryKey, sharedKey: ValueBoxKey = ValueBoxKey(length: 4 + 8 + 4)) -> ValueBoxKey {
+        sharedKey.setUInt32(0, value: key.tag.rawValue)
+        sharedKey.setInt64(4, value: key.peerId.toInt64())
+        sharedKey.setInt32(4 + 8, value: key.namespace)
+        return sharedKey
     }
     
     func get(_ key: MessageHistoryTagsSummaryKey) -> MessageHistoryTagNamespaceSummary? {
         if let cached = self.cachedSummaries[key] {
             return cached.summary
-        } else if let value = self.valueBox.get(self.table, key: self.keyShared(key: key)) {
+        } else if let value = self.valueBox.get(self.table, key: self.key(key: key, sharedKey: self.sharedKey)) {
             let entry = readSummary(value)
             self.cachedSummaries[key] = CachedEntry(summary: entry)
             return entry
@@ -174,10 +164,10 @@ class MessageHistoryTagsSummaryTable: Table {
                     if let summary = cached.summary {
                         buffer.reset()
                         writeSummary(summary, to: buffer)
-                        self.valueBox.set(self.table, key: self.keyShared(key: key), value: buffer)
+                        self.valueBox.set(self.table, key: self.key(key: key, sharedKey: self.sharedKey), value: buffer)
                     } else {
                         assertionFailure()
-                        self.valueBox.remove(self.table, key: self.keyShared(key: key), secure: false)
+                        self.valueBox.remove(self.table, key: self.key(key: key, sharedKey: self.sharedKey), secure: false)
                     }
                 } else {
                     assertionFailure()

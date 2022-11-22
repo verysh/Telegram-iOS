@@ -173,7 +173,7 @@ public class ComponentGesture {
 }
 
 public class AnyComponent<EnvironmentType>: _TypeErasedComponent, Equatable {
-    public let wrapped: _TypeErasedComponent
+    fileprivate let wrapped: _TypeErasedComponent
 
     public init<ComponentType: Component>(_ component: ComponentType) where ComponentType.EnvironmentType == EnvironmentType {
         self.wrapped = component

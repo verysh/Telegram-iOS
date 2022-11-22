@@ -174,7 +174,7 @@ public final class ShimmerEffectForegroundView: UIView {
     }
 }
 
-public final class ShimmerEffectForegroundNode: ASDisplayNode {
+final class ShimmerEffectForegroundNode: ASDisplayNode {
     private var currentBackgroundColor: UIColor?
     private var currentForegroundColor: UIColor?
     private var currentHorizontal: Bool?
@@ -187,7 +187,7 @@ public final class ShimmerEffectForegroundNode: ASDisplayNode {
     private var globalTimeOffset = true
     private var duration: Double?
     
-    public override init() {
+    override init() {
         self.imageNodeContainer = ASDisplayNode()
         self.imageNodeContainer.isLayerBacked = true
         
@@ -206,21 +206,21 @@ public final class ShimmerEffectForegroundNode: ASDisplayNode {
         self.addSubnode(self.imageNodeContainer)
     }
     
-    public override func didEnterHierarchy() {
+    override func didEnterHierarchy() {
         super.didEnterHierarchy()
         
         self.isCurrentlyInHierarchy = true
         self.updateAnimation()
     }
     
-    public override func didExitHierarchy() {
+    override func didExitHierarchy() {
         super.didExitHierarchy()
         
         self.isCurrentlyInHierarchy = false
         self.updateAnimation()
     }
     
-    public func update(backgroundColor: UIColor, foregroundColor: UIColor, horizontal: Bool, effectSize: CGFloat?, globalTimeOffset: Bool, duration: Double?) {
+    func update(backgroundColor: UIColor, foregroundColor: UIColor, horizontal: Bool, effectSize: CGFloat?, globalTimeOffset: Bool, duration: Double?) {
         if let currentBackgroundColor = self.currentBackgroundColor, currentBackgroundColor.isEqual(backgroundColor), let currentForegroundColor = self.currentForegroundColor, currentForegroundColor.isEqual(foregroundColor), self.currentHorizontal == horizontal {
             return
         }
@@ -274,7 +274,7 @@ public final class ShimmerEffectForegroundNode: ASDisplayNode {
         self.updateAnimation()
     }
     
-    public func updateAbsoluteRect(_ rect: CGRect, within containerSize: CGSize) {
+    func updateAbsoluteRect(_ rect: CGRect, within containerSize: CGSize) {
         if let absoluteLocation = self.absoluteLocation, absoluteLocation.0 == rect && absoluteLocation.1 == containerSize {
             return
         }
@@ -428,71 +428,5 @@ public final class ShimmerEffectNode: ASDisplayNode {
         self.backgroundNode.frame = CGRect(origin: CGPoint(), size: size)
         self.foregroundNode.frame = CGRect(origin: CGPoint(), size: size)
         self.effectNode.frame = CGRect(origin: CGPoint(), size: size)
-    }
-}
-
-public final class StandaloneShimmerEffect {
-    private var image: UIImage?
-    
-    private var background: UIColor?
-    private var foreground: UIColor?
-    
-    public var layer: CALayer? {
-        didSet {
-            if self.layer !== oldValue {
-                self.updateLayer()
-            }
-        }
-    }
-    
-    public init() {
-    }
-    
-    public func update(background: UIColor, foreground: UIColor) {
-        if self.background == background && self.foreground == foreground {
-            return
-        }
-        self.background = background
-        self.foreground = foreground
-        
-        self.image = generateImage(CGSize(width: 1.0, height: 320.0), opaque: false, scale: 1.0, rotatedContext: { size, context in
-            context.clear(CGRect(origin: CGPoint(), size: size))
-            context.setFillColor(background.cgColor)
-            context.fill(CGRect(origin: CGPoint(), size: size))
-
-            context.clip(to: CGRect(origin: CGPoint(), size: size))
-
-            let transparentColor = foreground.withAlphaComponent(0.0).cgColor
-            let peakColor = foreground.cgColor
-
-            var locations: [CGFloat] = [0.0, 0.5, 1.0]
-            let colors: [CGColor] = [transparentColor, peakColor, transparentColor]
-
-            let colorSpace = CGColorSpaceCreateDeviceRGB()
-            let gradient = CGGradient(colorsSpace: colorSpace, colors: colors as CFArray, locations: &locations)!
-
-            context.drawLinearGradient(gradient, start: CGPoint(x: 0.0, y: 0.0), end: CGPoint(x: 0.0, y: size.height), options: CGGradientDrawingOptions())
-        })
-        
-        self.updateLayer()
-    }
-    
-    public func updateLayer() {
-        guard let layer = self.layer, let image = self.image else {
-            return
-        }
-        
-        layer.contents = image.cgImage
-        
-        if layer.animation(forKey: "shimmer") == nil {
-            let animation = CABasicAnimation(keyPath: "contentsRect.origin.y")
-            animation.fromValue = 1.0 as NSNumber
-            animation.toValue = -1.0 as NSNumber
-            animation.isAdditive = true
-            animation.repeatCount = .infinity
-            animation.duration = 0.8
-            animation.beginTime = layer.convertTime(1.0, from: nil)
-            layer.add(animation, forKey: "shimmer")
-        }
     }
 }

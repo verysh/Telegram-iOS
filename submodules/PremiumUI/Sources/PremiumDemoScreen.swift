@@ -17,7 +17,7 @@ import SolidRoundedButtonComponent
 import Markdown
 import TelegramUIPreferences
 
-final class GradientBackgroundComponent: Component {
+private final class GradientBackgroundComponent: Component {
     public let colors: [UIColor]
     
     public init(
@@ -153,7 +153,7 @@ final class DemoPageEnvironment: Equatable {
     }
 }
 
-final class PageComponent<ChildEnvironment: Equatable>: CombinedComponent {
+private final class PageComponent<ChildEnvironment: Equatable>: CombinedComponent {
     typealias EnvironmentType = ChildEnvironment
     
     private let content: AnyComponent<ChildEnvironment>
@@ -263,7 +263,7 @@ final class PageComponent<ChildEnvironment: Equatable>: CombinedComponent {
     }
 }
 
-final class DemoPagerComponent: Component {
+private final class DemoPagerComponent: Component {
     public final class Item: Equatable {
         public let content: AnyComponentWithIdentity<DemoPageEnvironment>
         
@@ -282,28 +282,39 @@ final class DemoPagerComponent: Component {
     
     let items: [Item]
     let index: Int
-    let updated: (CGFloat, Int) -> Void
+    let activeColor: UIColor
+    let inactiveColor: UIColor
     
     public init(
         items: [Item],
         index: Int = 0,
-        updated: @escaping (CGFloat, Int) -> Void
+        activeColor: UIColor,
+        inactiveColor: UIColor
     ) {
         self.items = items
         self.index = index
-        self.updated = updated
+        self.activeColor = activeColor
+        self.inactiveColor = inactiveColor
     }
     
     public static func ==(lhs: DemoPagerComponent, rhs: DemoPagerComponent) -> Bool {
         if lhs.items != rhs.items {
             return false
         }
+        if !lhs.activeColor.isEqual(rhs.activeColor) {
+            return false
+        }
+        if !lhs.inactiveColor.isEqual(rhs.inactiveColor) {
+            return false
+        }
         return true
     }
     
-    final class View: UIView, UIScrollViewDelegate {
+    fileprivate final class View: UIView, UIScrollViewDelegate {
         private let scrollView: UIScrollView
         private var itemViews: [AnyHashable: ComponentHostView<DemoPageEnvironment>] = [:]
+        
+        private let pageIndicatorView: ComponentHostView<Empty>
         
         private var component: DemoPagerComponent?
         
@@ -315,15 +326,16 @@ final class DemoPagerComponent: Component {
             self.scrollView.alwaysBounceHorizontal = false
             self.scrollView.bounces = false
             self.scrollView.layer.cornerRadius = 10.0
-            if #available(iOSApplicationExtension 11.0, iOS 11.0, *) {
-                self.scrollView.contentInsetAdjustmentBehavior = .never
-            }
+            
+            self.pageIndicatorView = ComponentHostView<Empty>()
+            self.pageIndicatorView.isUserInteractionEnabled = false
             
             super.init(frame: frame)
             
             self.scrollView.delegate = self
             
             self.addSubview(self.scrollView)
+            self.addSubview(self.pageIndicatorView)
         }
         
         required init?(coder: NSCoder) {
@@ -338,7 +350,6 @@ final class DemoPagerComponent: Component {
 
             self.ignoreContentOffsetChange = true
             let _ = self.update(component: component, availableSize: self.bounds.size, transition: .immediate)
-            component.updated(self.scrollView.contentOffset.x / (self.scrollView.contentSize.width - self.scrollView.frame.width), component.items.count)
             self.ignoreContentOffsetChange = false
         }
         
@@ -358,7 +369,6 @@ final class DemoPagerComponent: Component {
             
             if firstTime {
                 self.scrollView.contentOffset = CGPoint(x: CGFloat(component.index) * availableSize.width, y: 0.0)
-                component.updated(self.scrollView.contentOffset.x / (self.scrollView.contentSize.width - self.scrollView.frame.width), component.items.count)
             }
             let viewportCenter = self.scrollView.contentOffset.x + availableSize.width * 0.5
             
@@ -387,6 +397,7 @@ final class DemoPagerComponent: Component {
                     itemTransition = transition.withAnimation(.none)
                     itemView = ComponentHostView<DemoPageEnvironment>()
                     self.itemViews[item.content.id] = itemView
+                    
                     
                     if item.content.id == (PremiumDemoScreen.Subject.fasterDownload as AnyHashable) {
                         self.scrollView.insertSubview(itemView, at: 0)
@@ -419,15 +430,33 @@ final class DemoPagerComponent: Component {
                 
             self.component = component
             
+            if component.items.count > 1 {
+                let pageIndicatorComponent = PageIndicatorComponent(
+                    pageCount: component.items.count,
+                    position: self.scrollView.contentOffset.x / (self.scrollView.contentSize.width - availableSize.width),
+                    inactiveColor: component.inactiveColor,
+                    activeColor: component.activeColor
+                )
+                let indicatorSize = self.pageIndicatorView.update(
+                    transition: .immediate,
+                    component: AnyComponent(
+                        pageIndicatorComponent
+                    ),
+                    environment: {},
+                    containerSize: availableSize
+                )
+                self.pageIndicatorView.frame = CGRect(origin: CGPoint(x: floorToScreenPixels((availableSize.width - indicatorSize.width) / 2.0), y: availableSize.height - indicatorSize.height - 11.0), size: indicatorSize)
+            }
+            
             return availableSize
         }
     }
     
-    func makeView() -> View {
+    public func makeView() -> View {
         return View(frame: CGRect())
     }
     
-    func update(view: View, availableSize: CGSize, state: EmptyComponentState, environment: Environment<Empty>, transition: Transition) -> CGSize {
+    public func update(view: View, availableSize: CGSize, state: EmptyComponentState, environment: Environment<Empty>, transition: Transition) -> CGSize {
         return view.update(component: self, availableSize: availableSize, transition: transition)
     }
 }
@@ -456,7 +485,7 @@ private final class DemoSheetContent: CombinedComponent {
         self.context = context
         self.subject = subject
         self.source = source
-        self.order = order ?? [.moreUpload, .fasterDownload, .voiceToText, .noAds, .uniqueReactions, .premiumStickers, .animatedEmoji, .advancedChatManagement, .profileBadge, .animatedUserpics, .appIcons]
+        self.order = order ?? [.moreUpload, .fasterDownload, .voiceToText, .noAds, .uniqueReactions, .premiumStickers, .advancedChatManagement, .profileBadge, .animatedUserpics, .appIcons]
         self.action = action
         self.dismiss = dismiss
     }
@@ -522,7 +551,7 @@ private final class DemoSheetContent: CombinedComponent {
                 self.context.engine.stickers.availableReactions(),
                 self.context.account.postbox.combinedView(keys: [stickersKey])
                 |> map { views -> [OrderedItemListEntry]? in
-                    if let view = views.views[stickersKey] as? OrderedItemListView {
+                    if let view = views.views[stickersKey] as? OrderedItemListView, !view.items.isEmpty {
                         return view.items
                     } else {
                         return nil
@@ -540,7 +569,7 @@ private final class DemoSheetContent: CombinedComponent {
                 stickerOverrideMessages
             )
             |> map { reactions, items, data, reactionOverrideMessages, stickerOverrideMessages -> ([AvailableReactions.Reaction], [TelegramMediaFile], Bool?, PremiumPromoConfiguration?) in
-                var reactionOverrides: [MessageReaction.Reaction: TelegramMediaFile] = [:]
+                var reactionOverrides: [String: TelegramMediaFile] = [:]
                 for item in accountSpecificReactionOverrides {
                     if let maybeMessage = reactionOverrideMessages[item.messageId], let message = maybeMessage {
                         for media in message.media {
@@ -551,7 +580,7 @@ private final class DemoSheetContent: CombinedComponent {
                     }
                 }
                 
-                var stickerOverrides: [MessageReaction.Reaction: TelegramMediaFile] = [:]
+                var stickerOverrides: [String: TelegramMediaFile] = [:]
                 for item in accountSpecificStickerOverrides {
                     if let maybeMessage = stickerOverrideMessages[item.messageId], let message = maybeMessage {
                         for media in message.media {
@@ -594,7 +623,7 @@ private final class DemoSheetContent: CombinedComponent {
                         for attribute in file.attributes {
                             switch attribute {
                             case let .Sticker(displayText, _, _):
-                                if let replacementFile = stickerOverrides[.builtin(displayText)], let dimensions = replacementFile.dimensions {
+                                if let replacementFile = stickerOverrides[displayText], let dimensions = replacementFile.dimensions {
                                     let _ = dimensions
                                     return TelegramMediaFile(
                                         fileId: file.fileId,
@@ -683,7 +712,7 @@ private final class DemoSheetContent: CombinedComponent {
                 isStandalone = true
             }
             
-            if let stickers = state.stickers, let appIcons = state.appIcons, let configuration = state.promoConfiguration {
+            if let reactions = state.reactions, let stickers = state.stickers, let appIcons = state.appIcons, let configuration = state.promoConfiguration {
                 let textColor = theme.actionSheet.primaryTextColor
                 
                 var availableItems: [PremiumPerk: DemoPagerComponent.Item] = [:]
@@ -765,14 +794,15 @@ private final class DemoSheetContent: CombinedComponent {
                         id: PremiumDemoScreen.Subject.uniqueReactions,
                         component: AnyComponent(
                             PageComponent(
-                                content: AnyComponent(PhoneDemoComponent(
-                                    context: component.context,
-                                    position: .top,
-                                    videoFile: configuration.videos["infinite_reactions"],
-                                    decoration: .swirlStars
-                                )),
-                                title: strings.Premium_InfiniteReactions,
-                                text: strings.Premium_InfiniteReactionsInfo,
+                                content: AnyComponent(
+                                    ReactionsCarouselComponent(
+                                        context: component.context,
+                                        theme: environment.theme,
+                                        reactions: reactions
+                                    )
+                                ),
+                                title: isStandalone ? strings.Premium_ReactionsStandalone : strings.Premium_Reactions,
+                                text: isStandalone ? strings.Premium_ReactionsStandaloneInfo : strings.Premium_ReactionsInfo,
                                 textColor: textColor
                             )
                         )
@@ -791,24 +821,6 @@ private final class DemoSheetContent: CombinedComponent {
                                 ),
                                 title: strings.Premium_Stickers,
                                 text: strings.Premium_StickersInfo,
-                                textColor: textColor
-                            )
-                        )
-                    )
-                )
-                availableItems[.emojiStatus] = DemoPagerComponent.Item(
-                    AnyComponentWithIdentity(
-                        id: PremiumDemoScreen.Subject.emojiStatus,
-                        component: AnyComponent(
-                            PageComponent(
-                                content: AnyComponent(PhoneDemoComponent(
-                                    context: component.context,
-                                    position: .top,
-                                    videoFile: configuration.videos["emoji_status"],
-                                    decoration: .badgeStars
-                                )),
-                                title: strings.Premium_EmojiStatus,
-                                text: strings.Premium_EmojiStatusInfo,
                                 textColor: textColor
                             )
                         )
@@ -885,29 +897,10 @@ private final class DemoSheetContent: CombinedComponent {
                     )
                 )
                 
-                availableItems[.animatedEmoji] = DemoPagerComponent.Item(
-                    AnyComponentWithIdentity(
-                        id: PremiumDemoScreen.Subject.animatedEmoji,
-                        component: AnyComponent(
-                            PageComponent(
-                                content: AnyComponent(PhoneDemoComponent(
-                                    context: component.context,
-                                    position: .bottom,
-                                    videoFile: configuration.videos["animated_emoji"],
-                                    decoration: .emoji
-                                )),
-                                title: strings.Premium_AnimatedEmoji,
-                                text: isStandalone ? strings.Premium_AnimatedEmojiStandaloneInfo : strings.Premium_AnimatedEmojiInfo,
-                                textColor: textColor
-                            )
-                        )
-                    )
-                )
-                
                 var items: [DemoPagerComponent.Item] = component.order.compactMap { availableItems[$0] }
                 let index: Int
                 switch component.source {
-                    case .intro, .gift:
+                    case .intro:
                         index = items.firstIndex(where: { (component.subject as AnyHashable) == $0.content.id }) ?? 0
                     case .other:
                         items = items.filter { item in
@@ -920,7 +913,8 @@ private final class DemoSheetContent: CombinedComponent {
                     component: DemoPagerComponent(
                         items: items,
                         index: index,
-                        updated: { _, _ in }
+                        activeColor: UIColor(rgb: 0x7169ff),
+                        inactiveColor: theme.list.disclosureArrowColor
                     ),
                     availableSize: CGSize(width: context.availableSize.width, height: context.availableSize.width + 154.0),
                     transition: context.transition
@@ -968,8 +962,6 @@ private final class DemoSheetContent: CombinedComponent {
                 switch component.source {
                     case let .intro(price):
                         buttonText = strings.Premium_SubscribeFor(price ?? "–").string
-                    case let .gift(price):
-                        buttonText = strings.Premium_Gift_GiftSubscription(price ?? "–").string
                     case .other:
                         switch component.subject {
                             case .uniqueReactions:
@@ -983,9 +975,6 @@ private final class DemoSheetContent: CombinedComponent {
                                 buttonAnimationName = "premium_unlock"
                             case .noAds:
                                 buttonText = strings.Premium_NoAds_Proceed
-                            case .animatedEmoji:
-                                buttonText = strings.Premium_AnimatedEmoji_Proceed
-                                buttonAnimationName = "premium_unlock"
                             default:
                                 buttonText = strings.Common_OK
                         }
@@ -1147,7 +1136,6 @@ private final class DemoSheetComponent: CombinedComponent {
 
 public class PremiumDemoScreen: ViewControllerComponentContainer {
     public enum Subject {
-        case doubleLimits
         case moreUpload
         case fasterDownload
         case voiceToText
@@ -1158,13 +1146,10 @@ public class PremiumDemoScreen: ViewControllerComponentContainer {
         case profileBadge
         case animatedUserpics
         case appIcons
-        case animatedEmoji
-        case emojiStatus
     }
     
     public enum Source: Equatable {
         case intro(String?)
-        case gift(String?)
         case other
     }
     

@@ -2,27 +2,12 @@ import Postbox
 import SwiftSignalKit
 
 public struct ReactionSettings: Equatable, Codable {
-    public static var `default` = ReactionSettings(quickReaction: .builtin("👍"))
+    public static var `default` = ReactionSettings(quickReaction: "👍")
 
-    public var quickReaction: MessageReaction.Reaction
+    public var quickReaction: String
 
-    public init(quickReaction: MessageReaction.Reaction) {
+    public init(quickReaction: String) {
         self.quickReaction = quickReaction
-    }
-}
-
-public extension ReactionSettings {
-    func effectiveQuickReaction(hasPremium: Bool) -> MessageReaction.Reaction {
-        switch self.quickReaction {
-        case .builtin:
-            return self.quickReaction
-        case .custom:
-            if hasPremium {
-                return self.quickReaction
-            } else {
-                return ReactionSettings.default.quickReaction
-            }
-        }
     }
 }
 

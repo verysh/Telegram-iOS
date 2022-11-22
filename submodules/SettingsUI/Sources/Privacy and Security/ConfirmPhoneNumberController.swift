@@ -10,7 +10,7 @@ import PresentationDataUtils
 import AccountContext
 import AlertUI
 import PresentationDataUtils
-import AuthorizationUtils
+import AuthorizationUI
 import PhoneNumberFormat
 
 private final class ConfirmPhoneNumberCodeControllerArguments {

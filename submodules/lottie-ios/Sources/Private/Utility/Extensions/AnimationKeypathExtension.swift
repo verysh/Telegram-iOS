@@ -114,29 +114,6 @@ extension KeypathSearchable {
     }
     return nil
   }
-    
-    func allLayers(for keyPath: AnimationKeypath) -> [CALayer] {
-        if keyPath.nextKeypath == nil, let layerKey = keyPath.currentKey, layerKey.equalsKeypath(keypathName) {
-            /// We found our layer!
-            
-            if let keypathLayer = self.keypathLayer {
-                return [keypathLayer]
-            } else {
-                return []
-            }
-        }
-        guard let nextKeypath = keyPath.popKey(keypathName) else {
-            /// Nope. Stop Search
-            return []
-        }
-        
-        /// Now check child keypaths.
-        var foundSublayers: [CALayer] = []
-        for child in childKeypaths {
-            foundSublayers.append(contentsOf: child.allLayers(for: nextKeypath))
-        }
-        return foundSublayers
-    }
 
   func logKeypaths(for keyPath: AnimationKeypath?) {
     let newKeypath: AnimationKeypath
@@ -152,29 +129,6 @@ extension KeypathSearchable {
     for child in childKeypaths {
       child.logKeypaths(for: newKeypath)
     }
-  }
-    
-  func allKeypaths(for keyPath: AnimationKeypath?, predicate: (AnimationKeypath) -> Bool) -> [String] {
-      var result: [String] = []
-      let newKeypath: AnimationKeypath
-      if let previousKeypath = keyPath {
-        newKeypath = previousKeypath.appendingKey(keypathName)
-      } else {
-        newKeypath = AnimationKeypath(keys: [keypathName])
-      }
-      if predicate(newKeypath) {
-          result.append(newKeypath.fullPath)
-      }
-      for key in keypathProperties.keys {
-          let subKey = newKeypath.appendingKey(key)
-          if predicate(subKey) {
-              result.append(subKey.fullPath)
-          }
-      }
-      for child in childKeypaths {
-        result.append(contentsOf: child.allKeypaths(for: newKeypath, predicate: predicate))
-      }
-      return result
   }
 }
 

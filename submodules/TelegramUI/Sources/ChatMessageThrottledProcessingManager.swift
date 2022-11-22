@@ -78,33 +78,16 @@ final class ChatMessageThrottledProcessingManager {
 final class ChatMessageVisibleThrottledProcessingManager {
     private let queue = Queue()
     
-    private let interval: Double
+    private let delay: Double
     
     private var currentIds = Set<MessageId>()
     
     var process: ((Set<MessageId>) -> Void)?
     
-    private let timer: SwiftSignalKit.Timer
+    private var timer: SwiftSignalKit.Timer?
     
-    init(interval: Double = 5.0) {
-        self.interval = interval
-        
-        var completionImpl: (() -> Void)?
-        let timer = SwiftSignalKit.Timer(timeout: self.interval, repeat: true, completion: {
-            completionImpl?()
-        }, queue: self.queue)
-        self.timer = timer
-        timer.start()
-                
-        completionImpl = { [weak self] in
-            if let strongSelf = self, !strongSelf.currentIds.isEmpty {
-                strongSelf.process?(strongSelf.currentIds)
-            }
-        }
-    }
-    
-    deinit {
-        self.timer.invalidate()
+    init(delay: Double = 1.0) {
+        self.delay = delay
     }
     
     func setProcess(process: @escaping (Set<MessageId>) -> Void) {
@@ -117,8 +100,21 @@ final class ChatMessageVisibleThrottledProcessingManager {
         self.queue.async {
             if self.currentIds != ids {
                 self.currentIds = ids
-                if !self.currentIds.isEmpty {
-                    self.process?(self.currentIds)
+                if self.timer == nil {
+                    var completionImpl: (() -> Void)?
+                    let timer = SwiftSignalKit.Timer(timeout: self.delay, repeat: false, completion: {
+                        completionImpl?()
+                    }, queue: self.queue)
+                    completionImpl = { [weak self, weak timer] in
+                        if let strongSelf = self {
+                            if let timer = timer, strongSelf.timer === timer {
+                                strongSelf.timer = nil
+                            }
+                            strongSelf.process?(strongSelf.currentIds)
+                        }
+                    }
+                    self.timer = timer
+                    timer.start()
                 }
             }
         }

@@ -38,7 +38,7 @@ private func commitOwnershipTransferController(context: AccountContext, updatedP
         controller?.theme = AlertControllerTheme(presentationData: presentationData)
         contentNode?.theme = presentationData.theme
     })
-    controller.dismissed = { _ in
+    controller.dismissed = {
         presentationDataDisposable.dispose()
         disposable.dispose()
     }

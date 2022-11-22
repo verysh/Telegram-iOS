@@ -14,12 +14,9 @@ swift_library(
         "//submodules/AsyncDisplayKit:AsyncDisplayKit",
         "//submodules/Display:Display",
         "//submodules/TelegramPresentationData:TelegramPresentationData",
-        "//submodules/TelegramCore:TelegramCore",
         "//submodules/ActivityIndicator:ActivityIndicator",
         "//submodules/AppBundle:AppBundle",
         "//submodules/ComponentFlow:ComponentFlow",
-        "//submodules/AvatarNode:AvatarNode",
-        "//submodules/AccountContext:AccountContext",
     ],
     visibility = [
         "//visibility:public",

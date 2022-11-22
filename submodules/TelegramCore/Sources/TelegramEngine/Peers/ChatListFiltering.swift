@@ -123,9 +123,13 @@ public struct ChatListFilterIncludePeers: Equatable, Hashable {
             self.pinnedPeers.insert(peerId, at: 0)
             return true
         } else {
-            self.peers.insert(peerId, at: 0)
-            self.pinnedPeers.insert(peerId, at: 0)
-            return true
+            if self.peers.count < 100 {
+                self.peers.insert(peerId, at: 0)
+                self.pinnedPeers.insert(peerId, at: 0)
+                return true
+            } else {
+                return false
+            }
         }
     }
     
@@ -213,7 +217,10 @@ public struct ChatListFilterData: Equatable, Hashable {
         if self.excludePeers.contains(peerId) {
             return false
         }
- 
+        if self.excludePeers.count >= 100 {
+            return false
+        }
+        
         let _ = self.includePeers.removePeer(peerId)
         self.excludePeers.append(peerId)
         
@@ -633,7 +640,7 @@ private func loadAndStorePeerChatInfos(accountPeerId: PeerId, postbox: Postbox, 
         
         return postbox.transaction { transaction -> Void in
             var peers: [Peer] = []
-            var peerPresences: [PeerId: Api.User] = [:]
+            var peerPresences: [PeerId: PeerPresence] = [:]
             var notificationSettings: [PeerId: PeerNotificationSettings] = [:]
             var channelStates: [PeerId: Int32] = [:]
             
@@ -647,7 +654,9 @@ private func loadAndStorePeerChatInfos(accountPeerId: PeerId, postbox: Postbox, 
                 for user in users {
                     let telegramUser = TelegramUser(user: user)
                     peers.append(telegramUser)
-                    peerPresences[telegramUser.id] = user
+                    if let presence = TelegramUserPresence(apiUser: user) {
+                        peerPresences[telegramUser.id] = presence
+                    }
                 }
                 
                 var topMessageIds = Set<MessageId>()
@@ -710,8 +719,8 @@ private func loadAndStorePeerChatInfos(accountPeerId: PeerId, postbox: Postbox, 
                         
                         transaction.resetIncomingReadStates([peerId: [Namespaces.Message.Cloud: .idBased(maxIncomingReadId: readInboxMaxId, maxOutgoingReadId: readOutboxMaxId, maxKnownId: topMessage, count: unreadCount, markedUnread: false)]])
                         
-                        transaction.replaceMessageTagSummary(peerId: peerId, threadId: nil, tagMask: .unseenPersonalMessage, namespace: Namespaces.Message.Cloud, count: unreadMentionsCount, maxId: topMessage)
-                        transaction.replaceMessageTagSummary(peerId: peerId, threadId: nil, tagMask: .unseenReaction, namespace: Namespaces.Message.Cloud, count: unreadReactionsCount, maxId: topMessage)
+                        transaction.replaceMessageTagSummary(peerId: peerId, tagMask: .unseenPersonalMessage, namespace: Namespaces.Message.Cloud, count: unreadMentionsCount, maxId: topMessage)
+                        transaction.replaceMessageTagSummary(peerId: peerId, tagMask: .unseenReaction, namespace: Namespaces.Message.Cloud, count: unreadReactionsCount, maxId: topMessage)
                         
                         if let pts = pts {
                             if transaction.getPeerChatState(peerId) == nil {

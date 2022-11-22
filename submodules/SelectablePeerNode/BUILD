@@ -22,8 +22,6 @@ swift_library(
         "//submodules/LocalizedPeerData:LocalizedPeerData",
         "//submodules/AccountContext:AccountContext",
         "//submodules/CheckNode:CheckNode",
-        "//submodules/ComponentFlow:ComponentFlow",
-        "//submodules/TelegramUI/Components/EmojiStatusComponent:EmojiStatusComponent",
     ],
     visibility = [
         "//visibility:public",

@@ -45,7 +45,6 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
         messageThreadHoles: messageThreadHoles,
         existingMessageTags: MessageTags.all,
         messageTagsWithSummary: [.unseenPersonalMessage, .pinned, .video, .photo, .gif, .music, .voiceOrInstantVideo, .webPage, .file, .unseenReaction],
-        messageTagsWithThreadSummary: [.unseenPersonalMessage, .unseenReaction],
         existingGlobalMessageTags: GlobalMessageTags.all,
         peerNamespacesRequiringMessageTextIndex: [Namespaces.Peer.SecretChat],
         peerSummaryCounterTags: { peer, isContact in
@@ -66,7 +65,7 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
                 case .broadcast:
                     return .channel
                 case .group:
-                    if channel.flags.contains(.isForum) {
+                    if channel.username != nil {
                         return .group
                     } else {
                         return .group
@@ -75,17 +74,6 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
             } else {
                 assertionFailure()
                 return .nonContact
-            }
-        },
-        peerSummaryIsThreadBased: { peer in
-            if let channel = peer as? TelegramChannel {
-                if channel.flags.contains(.isForum) {
-                    return true
-                } else {
-                    return false
-                }
-            } else {
-                return false
             }
         },
         additionalChatListIndexNamespace: Namespaces.Message.Cloud,
@@ -127,12 +115,6 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
                     updated.append(audioTranscription)
                 }
             }
-        },
-        decodeMessageThreadInfo: { entry in
-            guard let data = entry.get(MessageHistoryThreadData.self) else {
-                return nil
-            }
-            return Message.AssociatedThreadInfo(title: data.info.title, icon: data.info.icon, iconColor: data.info.iconColor)
         }
     )
 }()

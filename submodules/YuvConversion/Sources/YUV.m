@@ -173,7 +173,7 @@ void decodeYUVAToRGBA(uint8_t const *yuva, uint8_t *argb, int width, int height,
     }
 }
 
-void decodeYUVAPlanesToRGBA(uint8_t const *srcYpData, int srcYpBytesPerRow, uint8_t const *srcCbData, int srcCbBytesPerRow, uint8_t const *srcCrData, int srcCrBytesPerRow, bool hasAlpha, uint8_t const *alphaData, uint8_t *argb, int width, int height, int bytesPerRow, bool unpremultiply) {
+void decodeYUVAPlanesToRGBA(uint8_t const *srcYpData, int srcYpBytesPerRow, uint8_t const *srcCbData, int srcCbBytesPerRow, uint8_t const *srcCrData, int srcCrBytesPerRow, bool hasAlpha, uint8_t const *alphaData, uint8_t *argb, int width, int height, int bytesPerRow) {
     static vImage_YpCbCrToARGB info;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -220,11 +220,7 @@ void decodeYUVAPlanesToRGBA(uint8_t const *srcYpData, int srcYpBytesPerRow, uint
     }
 
     uint8_t permuteMap[4] = {3, 2, 1, 0};
-    if (unpremultiply) {
-        error = vImageUnpremultiplyData_ARGB8888(&dest, &dest, kvImageDoNotTile);
-    } else {
-        error = vImagePremultiplyData_ARGB8888(&dest, &dest, kvImageDoNotTile);
-    }
+    error = vImageUnpremultiplyData_ARGB8888(&dest, &dest, kvImageDoNotTile);
     error = vImagePermuteChannels_ARGB8888(&dest, &dest, permuteMap, kvImageDoNotTile);
     
     if (error != kvImageNoError) {

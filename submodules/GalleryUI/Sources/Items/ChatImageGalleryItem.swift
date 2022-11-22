@@ -130,9 +130,7 @@ class ChatImageGalleryItem: GalleryItem {
         
         node.setMessage(self.message, displayInfo: !self.displayInfoOnTop)
         for media in self.message.media {
-            if let invoice = media as? TelegramMediaInvoice, let extendedMedia = invoice.extendedMedia, case let .full(fullMedia) = extendedMedia, let image = fullMedia as? TelegramMediaImage {
-                node.setImage(imageReference: .message(message: MessageReference(self.message), media: image))
-            } else if let image = media as? TelegramMediaImage {
+            if let image = media as? TelegramMediaImage {
                 node.setImage(imageReference: .message(message: MessageReference(self.message), media: image))
                 break
             } else if let file = media as? TelegramMediaFile, file.mimeType.hasPrefix("image/") {
@@ -194,7 +192,6 @@ class ChatImageGalleryItem: GalleryItem {
 final class ChatImageGalleryItemNode: ZoomableContentGalleryItemNode {
     private let context: AccountContext
     private var message: Message?
-    private let presentationData: PresentationData
     
     private let imageNode: TransformImageNode
     private var recognizedContentNode: RecognizedContentContainer?
@@ -223,7 +220,6 @@ final class ChatImageGalleryItemNode: ZoomableContentGalleryItemNode {
     
     init(context: AccountContext, presentationData: PresentationData, performAction: @escaping (GalleryControllerInteractionTapAction) -> Void, openActionOptions: @escaping (GalleryControllerInteractionTapAction, Message) -> Void, present: @escaping (ViewController, Any?) -> Void) {
         self.context = context
-        self.presentationData = presentationData
         
         self.imageNode = TransformImageNode()
         self.imageNode.contentAnimations = .subsequentUpdates
@@ -239,8 +235,6 @@ final class ChatImageGalleryItemNode: ZoomableContentGalleryItemNode {
         self.statusNode.isHidden = true
         
         super.init()
-        
-        self.clipsToBounds = true
         
         self.imageNode.imageUpdated = { [weak self] _ in
             self?._ready.set(.single(Void()))
@@ -290,11 +284,6 @@ final class ChatImageGalleryItemNode: ZoomableContentGalleryItemNode {
     
     override func ready() -> Signal<Void, NoError> {
         return self._ready.get()
-    }
-    
-    override func screenFrameUpdated(_ frame: CGRect) {
-        let center = frame.midX - self.frame.width / 2.0
-        self.subnodeTransform = CATransform3DMakeTranslation(-center * 0.16, 0.0, 0.0)
     }
     
     override func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
@@ -485,22 +474,20 @@ final class ChatImageGalleryItemNode: ZoomableContentGalleryItemNode {
             }
             let baseNavigationController = strongSelf.baseNavigationController()
             baseNavigationController?.view.endEditing(true)
-            let controller = StickerPackScreen(context: context, mainStickerPack: packs[0], stickerPacks: packs, sendSticker: nil, actionPerformed: { actions in
-                if let (info, items, action) = actions.first {
-                    let animateInAsReplacement = false
-                    switch action {
-                    case .add:
-                        topController?.present(UndoOverlayController(presentationData: presentationData, content: .stickersModified(title: presentationData.strings.StickerPackActionInfo_AddedTitle, text: presentationData.strings.StickerPackActionInfo_AddedText(info.title).string, undo: false, info: info, topItem: items.first, context: context), elevatedLayout: true, animateInAsReplacement: animateInAsReplacement, action: { _ in
-                            return true
-                        }), in: .window(.root))
-                    case let .remove(positionInList):
-                        topController?.present(UndoOverlayController(presentationData: presentationData, content: .stickersModified(title: presentationData.strings.StickerPackActionInfo_RemovedTitle, text: presentationData.strings.StickerPackActionInfo_RemovedText(info.title).string, undo: true, info: info, topItem: items.first, context: context), elevatedLayout: true, animateInAsReplacement: animateInAsReplacement, action: { action in
-                            if case .undo = action {
-                                let _ = context.engine.stickers.addStickerPackInteractively(info: info, items: items, positionInList: positionInList).start()
-                            }
-                            return true
-                        }), in: .window(.root))
-                    }
+            let controller = StickerPackScreen(context: context, mainStickerPack: packs[0], stickerPacks: packs, sendSticker: nil, actionPerformed: { info, items, action in
+                let animateInAsReplacement = false
+                switch action {
+                case .add:
+                    topController?.present(UndoOverlayController(presentationData: presentationData, content: .stickersModified(title: presentationData.strings.StickerPackActionInfo_AddedTitle, text: presentationData.strings.StickerPackActionInfo_AddedText(info.title).string, undo: false, info: info, topItem: items.first, context: context), elevatedLayout: true, animateInAsReplacement: animateInAsReplacement, action: { _ in
+                        return true
+                    }), in: .window(.root))
+                case let .remove(positionInList):
+                    topController?.present(UndoOverlayController(presentationData: presentationData, content: .stickersModified(title: presentationData.strings.StickerPackActionInfo_RemovedTitle, text: presentationData.strings.StickerPackActionInfo_RemovedText(info.title).string, undo: true, info: info, topItem: items.first, context: context), elevatedLayout: true, animateInAsReplacement: animateInAsReplacement, action: { action in
+                        if case .undo = action {
+                            let _ = context.engine.stickers.addStickerPackInteractively(info: info, items: items, positionInList: positionInList).start()
+                        }
+                        return true
+                    }), in: .window(.root))
                 }
             })
             (baseNavigationController?.topViewController as? ViewController)?.present(controller, in: .window(.root), with: nil)
@@ -808,60 +795,6 @@ final class ChatImageGalleryItemNode: ZoomableContentGalleryItemNode {
         super.adjustForPreviewing()
         
         self.recognitionOverlayContentNode.isHidden = true
-    }
-    
-    private func canDelete() -> Bool {
-        guard let message = self.message else {
-            return false
-        }
-
-        var canDelete = false
-        if let peer = message.peers[message.id.peerId] {
-            if peer is TelegramUser || peer is TelegramSecretChat {
-                canDelete = true
-            } else if let _ = peer as? TelegramGroup {
-                canDelete = true
-            } else if let channel = peer as? TelegramChannel {
-                if message.flags.contains(.Incoming) {
-                    canDelete = channel.hasPermission(.deleteAllMessages)
-                } else {
-                    canDelete = true
-                }
-            } else {
-                canDelete = false
-            }
-        } else {
-            canDelete = false
-        }
-        return canDelete
-    }
-    
-    override var keyShortcuts: [KeyShortcut] {
-        let strings = self.presentationData.strings
-        
-        var keyShortcuts: [KeyShortcut] = []
-        keyShortcuts.append(
-            KeyShortcut(
-                title: strings.KeyCommand_Share,
-                input: "S",
-                modifiers: [.command],
-                action: { [weak self] in
-                    self?.footerContentNode.actionButtonPressed()
-                }
-            )
-        )
-        if self.canDelete() {
-            keyShortcuts.append(
-                KeyShortcut(
-                    input: "\u{8}",
-                    modifiers: [],
-                    action: { [weak self] in
-                        self?.footerContentNode.deleteButtonPressed()
-                    }
-                )
-            )
-        }
-        return keyShortcuts
     }
 }
 

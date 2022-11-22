@@ -5,12 +5,6 @@ public struct ImmediateTextNodeLayoutInfo {
     public let size: CGSize
     public let truncated: Bool
     public let numberOfLines: Int
-    
-    public init(size: CGSize, truncated: Bool, numberOfLines: Int) {
-        self.size = size
-        self.truncated = truncated
-        self.numberOfLines = numberOfLines
-    }
 }
 
 public class ImmediateTextNode: TextNode {
@@ -131,7 +125,7 @@ public class ImmediateTextNode: TextNode {
         }
     }
     
-    override open func didLoad() {
+    override public func didLoad() {
         super.didLoad()
         
         self.updateInteractiveActions()

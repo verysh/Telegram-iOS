@@ -266,7 +266,7 @@ private final class FeaturedPackItemNode: ListViewItemNode {
                 thumbnailItem = .animated(item.file.resource, item.file.dimensions ?? PixelDimensions(width: 100, height: 100), item.file.isVideoSticker)
                 resourceReference = MediaResourceReference.media(media: .standalone(media: item.file), resource: item.file.resource)
             } else if let dimensions = item.file.dimensions, let resource = chatMessageStickerResource(file: item.file, small: true) as? TelegramMediaResource {
-                thumbnailItem = .still(TelegramMediaImageRepresentation(dimensions: dimensions, resource: resource, progressiveSizes: [], immediateThumbnailData: nil, hasVideo: false))
+                thumbnailItem = .still(TelegramMediaImageRepresentation(dimensions: dimensions, resource: resource, progressiveSizes: [], immediateThumbnailData: nil))
                 resourceReference = MediaResourceReference.media(media: .standalone(media: item.file), resource: resource)
             }
         }
@@ -525,7 +525,7 @@ class StickerPaneTrendingListGridItemNode: GridItemNode {
         self.listView.transaction(deleteIndices: [], insertIndicesAndItems: [], updateIndicesAndItems: [], options: [.Synchronous, .LowLatency], scrollToItem: nil, updateSizeAndInsets: updateSizeAndInsets, stationaryItemRange: nil, updateOpaqueState: nil, completion: { _ in })
         
         if currentItem?.theme !== item.theme {
-            self.dismissButtonNode.setImage(PresentationResourcesChat.chatInputMediaPanelGridDismissImage(item.theme, color: item.theme.chat.inputMediaPanel.stickersSectionTextColor), for: [])
+            self.dismissButtonNode.setImage(PresentationResourcesChat.chatInputMediaPanelGridDismissImage(item.theme), for: [])
         }
         
         let leftInset: CGFloat = 9.0

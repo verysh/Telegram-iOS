@@ -362,7 +362,7 @@ public final class VoiceChatJoinScreen: ViewController {
                         let animation = contentNode.layer.makeAnimation(from: 0.0 as NSNumber, to: 1.0 as NSNumber, keyPath: "opacity", timingFunction: CAMediaTimingFunctionName.easeInEaseOut.rawValue, duration: 0.35)
                         animation.fillMode = .both
                         if !fastOut {
-                            animation.beginTime = contentNode.layer.convertTime(CACurrentMediaTime(), from: nil) + 0.1
+                            animation.beginTime = CACurrentMediaTime() + 0.1
                         }
                         contentNode.layer.add(animation, forKey: "opacity")
                         
@@ -712,6 +712,6 @@ final class VoiceChatPreviewContentNode: ASDisplayNode, ShareContentContainerNod
         self.contentOffsetUpdated?(-size.height + nodeHeight - 64.0, transition)
     }
     
-    func updateSelectedPeers(animated: Bool) {
+    func updateSelectedPeers() {
     }
 }

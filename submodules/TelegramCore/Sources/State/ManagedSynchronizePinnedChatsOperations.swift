@@ -136,7 +136,7 @@ private func synchronizePinnedChats(transaction: Transaction, postbox: Postbox, 
         var remoteItemIds: [PinnedItemId] = []
         
         var peers: [Peer] = []
-        var peerPresences: [PeerId: Api.User] = [:]
+        var peerPresences: [PeerId: PeerPresence] = [:]
         
         switch dialogs {
             case let .peerDialogs(dialogs, messages, chats, users, _):
@@ -148,7 +148,9 @@ private func synchronizePinnedChats(transaction: Transaction, postbox: Postbox, 
                 for user in users {
                     let telegramUser = TelegramUser(user: user)
                     peers.append(telegramUser)
-                    peerPresences[telegramUser.id] = user
+                    if let presence = TelegramUserPresence(apiUser: user) {
+                        peerPresences[telegramUser.id] = presence
+                    }
                 }
                 
                 loop: for dialog in dialogs {

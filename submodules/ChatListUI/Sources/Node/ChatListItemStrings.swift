@@ -4,7 +4,6 @@ import TelegramPresentationData
 import TelegramUIPreferences
 import TelegramStringFormatting
 import LocalizedPeerData
-import TextFormat
 
 private enum MessageGroupType {
     case photos
@@ -45,7 +44,7 @@ private func messageGroupType(messages: [EngineMessage]) -> MessageGroupType {
     return currentType
 }
 
-public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: PresentationPersonNameOrder, dateTimeFormat: PresentationDateTimeFormat, messages: [EngineMessage], chatPeer: EngineRenderedPeer, accountPeerId: EnginePeer.Id, enableMediaEmoji: Bool = true, isPeerGroup: Bool = false) -> (peer: EnginePeer?, hideAuthor: Bool, messageText: String, spoilers: [NSRange]?, customEmojiRanges: [(NSRange, ChatTextInputTextCustomEmojiAttribute)]?) {
+public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: PresentationPersonNameOrder, dateTimeFormat: PresentationDateTimeFormat, messages: [EngineMessage], chatPeer: EngineRenderedPeer, accountPeerId: EnginePeer.Id, enableMediaEmoji: Bool = true, isPeerGroup: Bool = false) -> (peer: EnginePeer?, hideAuthor: Bool, messageText: String, spoilers: [NSRange]?) {
     let peer: EnginePeer?
     
     let message = messages.last
@@ -53,7 +52,6 @@ public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: 
     var hideAuthor = false
     var messageText: String
     var spoilers: [NSRange]?
-    var customEmojiRanges: [(NSRange, ChatTextInputTextCustomEmojiAttribute)]?
     if let message = message {
         if let messageMain = messageMainPeer(message) {
             peer = messageMain
@@ -270,20 +268,14 @@ public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: 
                                     }
                                 }
                             default:
-                                switch action.action {
-                                case .topicCreated, .topicEdited:
-                                    hideAuthor = false
-                                default:
-                                    hideAuthor = true
-                                }
-                                if let (text, textSpoilers, customEmojiRangesValue) = plainServiceMessageString(strings: strings, nameDisplayOrder: nameDisplayOrder, dateTimeFormat: dateTimeFormat, message: message, accountPeerId: accountPeerId, forChatList: true, forForumOverview: false) {
+                                hideAuthor = true
+                                if let (text, textSpoilers) = plainServiceMessageString(strings: strings, nameDisplayOrder: nameDisplayOrder, dateTimeFormat: dateTimeFormat, message: message, accountPeerId: accountPeerId, forChatList: true) {
                                     messageText = text
                                     spoilers = textSpoilers
-                                    customEmojiRanges = customEmojiRangesValue
                                 }
                         }
                     case _ as TelegramMediaExpiredContent:
-                        if let (text, _, _) = plainServiceMessageString(strings: strings, nameDisplayOrder: nameDisplayOrder, dateTimeFormat: dateTimeFormat, message: message, accountPeerId: accountPeerId, forChatList: true, forForumOverview: false) {
+                        if let (text, _) = plainServiceMessageString(strings: strings, nameDisplayOrder: nameDisplayOrder, dateTimeFormat: dateTimeFormat, message: message, accountPeerId: accountPeerId, forChatList: true) {
                             messageText = text
                         }
                     case let poll as TelegramMediaPoll:
@@ -322,5 +314,5 @@ public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: 
         }
     }
     
-    return (peer, hideAuthor, messageText, spoilers, customEmojiRanges)
+    return (peer, hideAuthor, messageText, spoilers)
 }

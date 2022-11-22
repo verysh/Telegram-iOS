@@ -10,14 +10,13 @@ import TelegramUIPreferences
 import MergeLists
 import AccountContext
 import StickerPackPreviewUI
-import StickerPeekUI
 import ContextUI
 import ChatPresentationInterfaceState
 import PremiumUI
 import UndoUI
 
 final class HorizontalStickersChatContextPanelInteraction {
-    var previewedStickerItem: TelegramMediaFile?
+    var previewedStickerItem: StickerPackItem?
 }
 
 private func backgroundCenterImage(_ theme: PresentationTheme) -> UIImage? {
@@ -73,7 +72,7 @@ private struct StickerEntry: Identifiable, Comparable {
         return HorizontalStickerGridItem(account: account, file: self.file, theme: theme, isPreviewed: { item in
             return false//stickersInteraction.previewedStickerItem == item
         }, sendSticker: { file, node, rect in
-            let _ = interfaceInteraction.sendSticker(file, true, node, rect, nil, [])
+            let _ = interfaceInteraction.sendSticker(file, true, node, rect)
         })
     }
 }
@@ -118,7 +117,7 @@ final class HorizontalStickersChatContextPanelNode: ChatInputContextPanelNode {
     
     private var stickerPreviewController: StickerPreviewController?
     
-    override init(context: AccountContext, theme: PresentationTheme, strings: PresentationStrings, fontSize: PresentationFontSize, chatPresentationContext: ChatPresentationContext) {
+    override init(context: AccountContext, theme: PresentationTheme, strings: PresentationStrings, fontSize: PresentationFontSize) {
         self.strings = strings
         
         self.backgroundNode = ASImageNode()
@@ -145,7 +144,7 @@ final class HorizontalStickersChatContextPanelNode: ChatInputContextPanelNode {
         
         self.stickersInteraction = HorizontalStickersChatContextPanelInteraction()
         
-        super.init(context: context, theme: theme, strings: strings, fontSize: fontSize, chatPresentationContext: chatPresentationContext)
+        super.init(context: context, theme: theme, strings: strings, fontSize: fontSize)
         
         self.placement = .overTextInput
         self.isOpaque = false
@@ -174,14 +173,14 @@ final class HorizontalStickersChatContextPanelNode: ChatInputContextPanelNode {
                 if let itemNode = strongSelf.gridNode.itemNodeAtPoint(strongSelf.view.convert(point, to: strongSelf.gridNode.view)) as? HorizontalStickerGridItemNode, let item = itemNode.stickerItem {
                     return strongSelf.context.engine.stickers.isStickerSaved(id: item.file.fileId)
                     |> deliverOnMainQueue
-                    |> map { isStarred -> (UIView, CGRect, PeekControllerContent)? in
+                    |> map { isStarred -> (ASDisplayNode, PeekControllerContent)? in
                         if let strongSelf = self, let controllerInteraction = strongSelf.controllerInteraction {
                             var menuItems: [ContextMenuItem] = []
                             menuItems = [
                                 .action(ContextMenuActionItem(text: strongSelf.strings.StickerPack_Send, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Resend"), color: theme.contextMenu.primaryColor) }, action: { _, f in
                                     f(.default)
                                 
-                                    let _ = controllerInteraction.sendSticker(.standalone(media: item.file), false, false, nil, true, itemNode.view, itemNode.bounds, nil, [])
+                                    let _ = controllerInteraction.sendSticker(.standalone(media: item.file), false, false, nil, true, itemNode, itemNode.bounds)
                                 })),
                                 .action(ContextMenuActionItem(text: isStarred ? strongSelf.strings.Stickers_RemoveFromFavorites : strongSelf.strings.Stickers_AddToFavorites, icon: { theme in generateTintedImage(image: isStarred ? UIImage(bundleImageName: "Chat/Context Menu/Unfave") : UIImage(bundleImageName: "Chat/Context Menu/Fave"), color: theme.contextMenu.primaryColor) }, action: { [weak self] _, f in
                                     f(.default)
@@ -192,7 +191,7 @@ final class HorizontalStickersChatContextPanelNode: ChatInputContextPanelNode {
                                         |> deliverOnMainQueue).start(next: { result in
                                             switch result {
                                                 case .generic:
-                                                    strongSelf.interfaceInteraction?.presentGlobalOverlayController(UndoOverlayController(presentationData: presentationData, content: .sticker(context: strongSelf.context, file: item.file, title: nil, text: !isStarred ? strongSelf.strings.Conversation_StickerAddedToFavorites : strongSelf.strings.Conversation_StickerRemovedFromFavorites, undoText: nil, customAction: nil), elevatedLayout: false, action: { _ in return false }), nil)
+                                                    strongSelf.interfaceInteraction?.presentGlobalOverlayController(UndoOverlayController(presentationData: presentationData, content: .sticker(context: strongSelf.context, file: item.file, title: nil, text: !isStarred ? strongSelf.strings.Conversation_StickerAddedToFavorites : strongSelf.strings.Conversation_StickerRemovedFromFavorites, undoText: nil), elevatedLayout: false, action: { _ in return false }), nil)
                                                 case let .limitExceeded(limit, premiumLimit):
                                                     let premiumConfiguration = PremiumConfiguration.with(appConfiguration: strongSelf.context.currentAppConfiguration.with { $0 })
                                                     let text: String
@@ -201,7 +200,7 @@ final class HorizontalStickersChatContextPanelNode: ChatInputContextPanelNode {
                                                     } else {
                                                         text = strongSelf.strings.Premium_MaxFavedStickersText("\(premiumLimit)").string
                                                     }
-                                                    strongSelf.interfaceInteraction?.presentGlobalOverlayController(UndoOverlayController(presentationData: presentationData, content: .sticker(context: strongSelf.context, file: item.file, title: strongSelf.strings.Premium_MaxFavedStickersTitle("\(limit)").string, text: text, undoText: nil, customAction: nil), elevatedLayout: false, action: { [weak self] action in
+                                                    strongSelf.interfaceInteraction?.presentGlobalOverlayController(UndoOverlayController(presentationData: presentationData, content: .sticker(context: strongSelf.context, file: item.file, title: strongSelf.strings.Premium_MaxFavedStickersTitle("\(limit)").string, text: text, undoText: nil), elevatedLayout: false, action: { [weak self] action in
                                                         if let strongSelf = self {
                                                             if case .info = action {
                                                                 let controller = PremiumIntroScreen(context: strongSelf.context, source: .savedStickers)
@@ -225,7 +224,7 @@ final class HorizontalStickersChatContextPanelNode: ChatInputContextPanelNode {
                                                 if let packReference = packReference {
                                                     let controller = StickerPackScreen(context: strongSelf.context, mainStickerPack: packReference, stickerPacks: [packReference], parentNavigationController: controllerInteraction.navigationController(), sendSticker: { file, sourceNode, sourceRect in
                                                         if let strongSelf = self, let controllerInteraction = strongSelf.controllerInteraction {
-                                                            return controllerInteraction.sendSticker(file, false, false, nil, true, sourceNode, sourceRect, nil, [])
+                                                            return controllerInteraction.sendSticker(file, false, false, nil, true, sourceNode, sourceRect)
                                                         } else {
                                                             return false
                                                         }
@@ -242,7 +241,7 @@ final class HorizontalStickersChatContextPanelNode: ChatInputContextPanelNode {
                                     }
                                 }))
                             ]
-                            return (itemNode.view, itemNode.bounds, StickerPreviewPeekContent(account: strongSelf.context.account, theme: strongSelf.theme, strings: strongSelf.strings, item: .pack(item.file), menu: menuItems, openPremiumIntro: { [weak self] in
+                            return (itemNode, StickerPreviewPeekContent(account: strongSelf.context.account, theme: strongSelf.theme, strings: strongSelf.strings, item: .pack(item), menu: menuItems, openPremiumIntro: { [weak self] in
                                 guard let strongSelf = self else {
                                     return
                                 }
@@ -256,11 +255,11 @@ final class HorizontalStickersChatContextPanelNode: ChatInputContextPanelNode {
                 }
             }
             return nil
-            }, present: { [weak self] content, sourceView, sourceRect in
+            }, present: { [weak self] content, sourceNode in
                 if let strongSelf = self {
                     let presentationData = strongSelf.context.sharedContext.currentPresentationData.with { $0 }
-                    let controller = PeekController(presentationData: presentationData, content: content, sourceView: {
-                        return (sourceView, sourceRect)
+                    let controller = PeekController(presentationData: presentationData, content: content, sourceNode: {
+                        return sourceNode
                     })
                     strongSelf.interfaceInteraction?.presentGlobalOverlayController(controller, nil)
                     return controller
@@ -268,11 +267,11 @@ final class HorizontalStickersChatContextPanelNode: ChatInputContextPanelNode {
                 return nil
             }, updateContent: { [weak self] content in
                 if let strongSelf = self {
-                    var file: TelegramMediaFile?
+                    var item: StickerPackItem?
                     if let content = content as? StickerPreviewPeekContent, case let .pack(contentItem) = content.item {
-                        file = contentItem
+                        item = contentItem
                     }
-                    strongSelf.updatePreviewingItem(file: file, animated: true)
+                    strongSelf.updatePreviewingItem(item: item, animated: true)
                 }
         }))
     }
@@ -367,9 +366,9 @@ final class HorizontalStickersChatContextPanelNode: ChatInputContextPanelNode {
         return super.hitTest(point, with: event)
     }
     
-    private func updatePreviewingItem(file: TelegramMediaFile?, animated: Bool) {
-        if self.stickersInteraction.previewedStickerItem?.fileId != file?.fileId {
-            self.stickersInteraction.previewedStickerItem = file
+    private func updatePreviewingItem(item: StickerPackItem?, animated: Bool) {
+        if self.stickersInteraction.previewedStickerItem != item {
+            self.stickersInteraction.previewedStickerItem = item
             
             self.gridNode.forEachItemNode { itemNode in
                 if let itemNode = itemNode as? HorizontalStickerGridItemNode {

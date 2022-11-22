@@ -13,7 +13,7 @@ private struct ScanFilesResult {
     var totalSize: UInt64 = 0
 }
 
-public func printOpenFiles() {
+private func printOpenFiles() {
     var flags: Int32 = 0
     var fd: Int32 = 0
     var buf = Data(count: Int(MAXPATHLEN) + 1)

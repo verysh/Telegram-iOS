@@ -32,14 +32,12 @@ protocol RootAnimationLayer: CALayer {
   func reloadImages()
   func forceDisplayUpdate()
   func logHierarchyKeypaths()
-  func allKeypaths(predicate: (AnimationKeypath) -> Bool) -> [String]
 
   func setValueProvider(_ valueProvider: AnyValueProvider, keypath: AnimationKeypath)
   func getValue(for keypath: AnimationKeypath, atFrame: AnimationFrameTime?) -> Any?
   func getOriginalValue(for keypath: AnimationKeypath, atFrame: AnimationFrameTime?) -> Any?
 
   func layer(for keypath: AnimationKeypath) -> CALayer?
-  func allLayers(for keypath: AnimationKeypath) -> [CALayer]
   func animatorNodes(for keypath: AnimationKeypath) -> [AnimatorNode]?
 }
 

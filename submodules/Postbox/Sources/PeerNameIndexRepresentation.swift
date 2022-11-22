@@ -1,27 +1,27 @@
 import Foundation
 
 public enum PeerIndexNameRepresentation: Equatable {
-    case title(title: String, addressNames: [String])
-    case personName(first: String, last: String, addressNames: [String], phoneNumber: String?)
+    case title(title: String, addressName: String?)
+    case personName(first: String, last: String, addressName: String?, phoneNumber: String?)
     
     public var isEmpty: Bool {
         switch self {
-            case let .title(title, addressNames):
+            case let .title(title, addressName):
                 if !title.isEmpty {
                     return false
                 }
-                if !addressNames.isEmpty {
+                if let addressName = addressName, !addressName.isEmpty {
                     return false
                 }
                 return true
-            case let .personName(first, last, addressNames, phoneNumber):
+            case let .personName(first, last, addressName, phoneNumber):
                 if !first.isEmpty {
                     return false
                 }
                 if !last.isEmpty {
                     return false
                 }
-                if !addressNames.isEmpty {
+                if let addressName = addressName, !addressName.isEmpty {
                     return false
                 }
                 if let phoneNumber = phoneNumber, !phoneNumber.isEmpty {
@@ -72,16 +72,16 @@ extension PeerIndexNameRepresentation {
     
     public var indexTokens: [ValueBoxKey] {
         switch self {
-            case let .title(title, addressNames):
+            case let .title(title, addressName):
                 var tokens: [ValueBoxKey] = stringIndexTokens(title, transliteration: .combined)
-                for addressName in addressNames {
+                if let addressName = addressName {
                     tokens.append(contentsOf: stringIndexTokens(addressName, transliteration: .none))
                 }
                 return tokens
-            case let .personName(first, last, addressNames, phoneNumber):
+            case let .personName(first, last, addressName, phoneNumber):
                 var tokens: [ValueBoxKey] = stringIndexTokens(first, transliteration: .combined)
                 tokens.append(contentsOf: stringIndexTokens(last, transliteration: .combined))
-                for addressName in addressNames {
+                if let addressName = addressName {
                     tokens.append(contentsOf: stringIndexTokens(addressName, transliteration: .none))
                 }
                 if let phoneNumber = phoneNumber {

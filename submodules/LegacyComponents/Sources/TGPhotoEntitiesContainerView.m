@@ -174,8 +174,7 @@
 - (void)setupWithPaintingData:(TGPaintingData *)paintingData {
     [self removeAll];
     for (TGPhotoPaintEntity *entity in paintingData.entities) {
-        UIView * entityView = [self createEntityViewWithEntity:entity];
-        [self addSubview:entityView];
+        [self createEntityViewWithEntity:entity];
     }
 }
 

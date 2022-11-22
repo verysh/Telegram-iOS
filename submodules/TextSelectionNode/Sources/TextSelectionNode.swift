@@ -4,13 +4,6 @@ import UIKit.UIGestureRecognizerSubclass
 import AsyncDisplayKit
 import Display
 import TelegramPresentationData
-import TextFormat
-
-private extension CGRect {
-    var center: CGPoint {
-        return CGPoint(x: self.midX, y: self.midY)
-    }
-}
 
 private func findScrollView(view: UIView?) -> UIScrollView? {
     if let view = view {
@@ -501,43 +494,20 @@ public final class TextSelectionNode: ASDisplayNode {
         }
         completeRect = completeRect.insetBy(dx: 0.0, dy: -12.0)
         
-        let string = NSMutableAttributedString(attributedString: attributedString.attributedSubstring(from: range))
-        
-        var fullRange = NSRange(location: 0, length: string.length)
-        while true {
-            var found = false
-            string.enumerateAttribute(originalTextAttributeKey, in: fullRange, options: [], using: { value, range, stop in
-                if let value = value as? String {
-                    let updatedSubstring = NSMutableAttributedString(string: value)
-                    
-                    let replacementRange = NSRange(location: 0, length: updatedSubstring.length)
-                    updatedSubstring.addAttributes(string.attributes(at: range.location, effectiveRange: nil), range: replacementRange)
-                    
-                    string.replaceCharacters(in: range, with: updatedSubstring)
-                    let updatedRange = NSRange(location: range.location, length: updatedSubstring.length)
-                    
-                    found = true
-                    stop.pointee = ObjCBool(true)
-                    fullRange = NSRange(location: updatedRange.upperBound, length: fullRange.upperBound - range.upperBound)
-                }
-            })
-            if !found {
-                break
-            }
-        }
+        let attributedText = attributedString.attributedSubstring(from: range)
         
         var actions: [ContextMenuAction] = []
         actions.append(ContextMenuAction(content: .text(title: self.strings.Conversation_ContextMenuCopy, accessibilityLabel: self.strings.Conversation_ContextMenuCopy), action: { [weak self] in
-            self?.performAction(string, .copy)
+            self?.performAction(attributedText, .copy)
             self?.dismissSelection()
         }))
         actions.append(ContextMenuAction(content: .text(title: self.strings.Conversation_ContextMenuLookUp, accessibilityLabel: self.strings.Conversation_ContextMenuLookUp), action: { [weak self] in
-            self?.performAction(string, .lookup)
+            self?.performAction(attributedText, .lookup)
             self?.dismissSelection()
         }))
         if #available(iOS 15.0, *) {
             actions.append(ContextMenuAction(content: .text(title: self.strings.Conversation_ContextMenuTranslate, accessibilityLabel: self.strings.Conversation_ContextMenuTranslate), action: { [weak self] in
-                self?.performAction(string, .translate)
+                self?.performAction(attributedText, .translate)
                 self?.dismissSelection()
             }))
         }
@@ -548,7 +518,7 @@ public final class TextSelectionNode: ASDisplayNode {
 //            }))
 //        }
         actions.append(ContextMenuAction(content: .text(title: self.strings.Conversation_ContextMenuShare, accessibilityLabel: self.strings.Conversation_ContextMenuShare), action: { [weak self] in
-            self?.performAction(string, .share)
+            self?.performAction(attributedText, .share)
             self?.dismissSelection()
         }))
         

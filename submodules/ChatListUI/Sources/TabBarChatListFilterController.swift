@@ -26,7 +26,7 @@ func chatListFilterItems(context: AccountContext) -> Signal<(Int, [(ChatListFilt
         }
         if !additionalPeerIds.isEmpty {
             for peerId in additionalPeerIds {
-                unreadCountItems.append(.peer(id: peerId, handleThreads: true))
+                unreadCountItems.append(.peer(peerId))
             }
         }
         for groupId in additionalGroupIds {

@@ -140,7 +140,6 @@ public final class MediaBox {
     private let statusQueue = Queue()
     private let concurrentQueue = Queue.concurrentDefaultQueue()
     private let dataQueue = Queue()
-    private let dataFileManager: MediaBoxFileManager
     private let cacheQueue = Queue()
     private let timeBasedCleanup: TimeBasedCleanup
     
@@ -189,13 +188,10 @@ public final class MediaBox {
         
         self.timeBasedCleanup = TimeBasedCleanup(generalPaths: [
             self.basePath,
-            self.basePath + "/cache",
-            self.basePath + "/animation-cache"
+            self.basePath + "/cache"
         ], shortLivedPaths: [
             self.basePath + "/short-cache"
         ])
-        
-        self.dataFileManager = MediaBoxFileManager(queue: self.dataQueue)
         
         let _ = self.ensureDirectoryCreated
     }
@@ -543,7 +539,7 @@ public final class MediaBox {
                 paths.partial,
                 paths.partial + ".meta"
             ])
-            if let fileContext = MediaBoxFileContext(queue: self.dataQueue, manager: self.dataFileManager, path: paths.complete, partialPath: paths.partial, metaPath: paths.partial + ".meta") {
+            if let fileContext = MediaBoxFileContext(queue: self.dataQueue, path: paths.complete, partialPath: paths.partial, metaPath: paths.partial + ".meta") {
                 context = fileContext
                 self.fileContexts[resourceId] = fileContext
             } else {
@@ -574,12 +570,6 @@ public final class MediaBox {
             let disposable = MetaDisposable()
             
             self.dataQueue.async {
-                let paths = self.storePathsForId(resource.id)
-                if let _ = fileSize(paths.complete) {
-                    subscriber.putCompletion()
-                    return
-                }
-                
                 guard let (fileContext, releaseContext) = self.fileContext(for: resource.id) else {
                     subscriber.putCompletion()
                     return
@@ -642,11 +632,7 @@ public final class MediaBox {
                         subscriber.putCompletion()
                         return EmptyDisposable
                     } else {
-                        let tempManager = MediaBoxFileManager(queue: nil)
-                        let data = withExtendedLifetime(tempManager, {
-                            return MediaBoxPartialFile.extractPartialData(manager: tempManager, path: paths.partial, metaPath: paths.partial + ".meta", range: range)
-                        })
-                        if let data = data {
+                        if let data = MediaBoxPartialFile.extractPartialData(path: paths.partial, metaPath: paths.partial + ".meta", range: range) {
                             subscriber.putNext((data, true))
                             subscriber.putCompletion()
                             return EmptyDisposable
@@ -686,15 +672,6 @@ public final class MediaBox {
                                 case .partial:
                                     subscriber.putNext((Data(), false))
                             }
-                        }
-                    } else {
-                        switch mode {
-                            case .complete, .incremental:
-                                if notifyAboutIncomplete {
-                                    subscriber.putNext((Data(), false))
-                                }
-                            case .partial:
-                                subscriber.putNext((Data(), false))
                         }
                     }
                 })
@@ -1260,27 +1237,6 @@ public final class MediaBox {
                         }
                     }
                 }
-                
-                func processRecursive(directoryPath: String, subdirectoryPath: String) {
-                    if let enumerator = FileManager.default.enumerator(at: URL(fileURLWithPath: directoryPath), includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey], options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants], errorHandler: nil) {
-                        loop: for url in enumerator {
-                            if let url = url as? URL {
-                                if let prefix = url.lastPathComponent.components(separatedBy: ":").first, excludePrefixes.contains(prefix) {
-                                    continue loop
-                                }
-                                
-                                if let isDirectory = (try? url.resourceValues(forKeys: Set([.isDirectoryKey])))?.isDirectory, isDirectory {
-                                    processRecursive(directoryPath: url.path, subdirectoryPath: subdirectoryPath + "/\(url.lastPathComponent)")
-                                } else if let value = (try? url.resourceValues(forKeys: Set([.fileSizeKey])))?.fileSize, value != 0 {
-                                    paths.append("\(subdirectoryPath)/" + url.lastPathComponent)
-                                    cacheResult += Int64(value)
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                processRecursive(directoryPath: self.basePath + "/animation-cache", subdirectoryPath: "animation-cache")
                 
                 if let enumerator = FileManager.default.enumerator(at: URL(fileURLWithPath: self.basePath + "/short-cache"), includingPropertiesForKeys: [.fileSizeKey], options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants], errorHandler: nil) {
                     loop: for url in enumerator {

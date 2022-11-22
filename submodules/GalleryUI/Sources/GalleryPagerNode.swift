@@ -457,7 +457,7 @@ public final class GalleryPagerNode: ASDisplayNode, UIScrollViewDelegate, UIGest
         }
     }
     
-    func canGoToPreviousItem() -> Bool {
+    private func canGoToPreviousItem() -> Bool {
         if self.disableTapNavigation {
             return false
         }
@@ -468,7 +468,7 @@ public final class GalleryPagerNode: ASDisplayNode, UIScrollViewDelegate, UIGest
         }
     }
     
-    func canGoToNextItem() -> Bool {
+    private func canGoToNextItem() -> Bool {
         if self.disableTapNavigation {
             return false
         }
@@ -479,13 +479,13 @@ public final class GalleryPagerNode: ASDisplayNode, UIScrollViewDelegate, UIGest
         }
     }
     
-    func goToPreviousItem() {
+    private func goToPreviousItem() {
         if let index = self.centralItemIndex, index > 0 {
             self.transaction(GalleryPagerTransaction(deleteItems: [], insertItems: [], updateItems: [], focusOnItem: index - 1, synchronous: false))
         }
     }
     
-    func goToNextItem() {
+    private func goToNextItem() {
         if let index = self.centralItemIndex, index < self.items.count - 1 {
             self.transaction(GalleryPagerTransaction(deleteItems: [], insertItems: [], updateItems: [], focusOnItem: index + 1, synchronous: false))
         }

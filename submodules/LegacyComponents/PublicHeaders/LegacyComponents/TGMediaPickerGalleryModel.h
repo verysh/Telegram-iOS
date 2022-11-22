@@ -14,7 +14,6 @@
 
 @class TGMediaSelectionContext;
 @protocol TGMediaSelectableItem;
-@protocol TGModernGalleryEditableItem;
 
 @protocol TGPhotoPaintStickersContext;
 

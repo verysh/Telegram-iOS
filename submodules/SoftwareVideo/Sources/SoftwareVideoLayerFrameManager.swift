@@ -5,7 +5,6 @@ import TelegramCore
 import SwiftSignalKit
 import CoreMedia
 import UniversalMediaPlayer
-import AVFoundation
 
 public let softwareVideoApplyQueue = Queue()
 public let softwareVideoWorkers = ThreadPool(threadCount: 3, threadPriority: 0.2)
@@ -26,8 +25,7 @@ public final class SoftwareVideoLayerFrameManager {
     private let resource: MediaResource
     private let secondaryResource: MediaResource?
     private let queue: ThreadPoolQueue
-    private let layerHolder: SampleBufferLayer?
-    private weak var layer: AVSampleBufferDisplayLayer?
+    private let layerHolder: SampleBufferLayer
     
     private var rotationAngle: CGFloat = 0.0
     private var aspect: CGFloat = 1.0
@@ -35,9 +33,9 @@ public final class SoftwareVideoLayerFrameManager {
     private var layerRotationAngleAndAspect: (CGFloat, CGFloat)?
     
     private var didStart = false
-    public var started: () -> Void = { }
+    var started: () -> Void = { }
     
-    public init(account: Account, fileReference: FileMediaReference, layerHolder: SampleBufferLayer?, layer: AVSampleBufferDisplayLayer? = nil, hintVP9: Bool = false) {
+    public init(account: Account, fileReference: FileMediaReference, layerHolder: SampleBufferLayer, hintVP9: Bool = false) {
         var resource = fileReference.media.resource
         var secondaryResource: MediaResource?
         for attribute in fileReference.media.attributes {
@@ -56,9 +54,8 @@ public final class SoftwareVideoLayerFrameManager {
         self.secondaryResource = secondaryResource
         self.queue = ThreadPoolQueue(threadPool: softwareVideoWorkers)
         self.layerHolder = layerHolder
-        self.layer = layer ?? layerHolder?.layer
-        self.layer?.videoGravity = .resizeAspectFill
-        self.layer?.masksToBounds = true
+        layerHolder.layer.videoGravity = .resizeAspectFill
+        layerHolder.layer.masksToBounds = true
         self.fetchDisposable = fetchedMediaResource(mediaBox: account.postbox.mediaBox, reference: fileReference.resourceReference(resource)).start()
     }
     
@@ -116,7 +113,7 @@ public final class SoftwareVideoLayerFrameManager {
                 let size = fileSize(path)
                 Logger.shared.log("SoftwareVideo", "loaded video from \(stringForResource(resource)) (file size: \(String(describing: size))")
                 
-                let _ = strongSelf.source.swap(SoftwareVideoSource(path: path, hintVP9: strongSelf.hintVP9, unpremultiplyAlpha: true))
+                let _ = strongSelf.source.swap(SoftwareVideoSource(path: path, hintVP9: strongSelf.hintVP9))
             }
         }))
     }
@@ -142,8 +139,8 @@ public final class SoftwareVideoLayerFrameManager {
                     for i in (0 ... latestFrameIndex).reversed() {
                         self.frames.remove(at: i)
                     }
-                    if self.layer?.status == .failed {
-                        self.layer?.flush()
+                    if self.layerHolder.layer.status == .failed {
+                        self.layerHolder.layer.flush()
                     }
                     /*if self.layerRotationAngleAndAspect?.0 != self.rotationAngle || self.layerRotationAngleAndAspect?.1 != self.aspect {
                         self.layerRotationAngleAndAspect = (self.rotationAngle, self.aspect)
@@ -153,7 +150,7 @@ public final class SoftwareVideoLayerFrameManager {
                         }
                         self.layerHolder.layer.setAffineTransform(transform)
                     }*/
-                    self.layer?.enqueue(frame.sampleBuffer)
+                    self.layerHolder.layer.enqueue(frame.sampleBuffer)
                     
                     if !self.didStart {
                         self.didStart = true

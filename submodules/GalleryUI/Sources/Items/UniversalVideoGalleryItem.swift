@@ -147,15 +147,10 @@ private let moreButtonImage = generateTintedImage(image: UIImage(bundleImageName
 private let placeholderFont = Font.regular(16.0)
 
 private final class UniversalVideoGalleryItemPictureInPictureNode: ASDisplayNode {
-    enum Mode {
-        case pictureInPicture
-        case airplay
-    }
-    
     private let iconNode: ASImageNode
     private let textNode: ASTextNode
     
-    init(strings: PresentationStrings, mode: Mode) {
+    init(strings: PresentationStrings) {
         self.iconNode = ASImageNode()
         self.iconNode.isLayerBacked = true
         self.iconNode.displayWithoutProcessing = true
@@ -165,19 +160,9 @@ private final class UniversalVideoGalleryItemPictureInPictureNode: ASDisplayNode
         self.textNode = ASTextNode()
         self.textNode.isUserInteractionEnabled = false
         self.textNode.displaysAsynchronously = false
-        
-        let text: String
-        switch mode {
-        case .pictureInPicture:
-            text = strings.Embed_PlayingInPIP
-        case .airplay:
-            text = strings.Gallery_AirPlayPlaceholder
-        }
-        self.textNode.attributedText = NSAttributedString(string: text, font: placeholderFont, textColor: UIColor(rgb: 0x8e8e93))
+        self.textNode.attributedText = NSAttributedString(string: strings.Embed_PlayingInPIP, font: placeholderFont, textColor: UIColor(rgb: 0x8e8e93))
         
         super.init()
-        
-        self.backgroundColor = UIColor(rgb: 0x333335)
         
         self.addSubnode(self.iconNode)
         self.addSubnode(self.textNode)
@@ -775,7 +760,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
     private var scrubbingFrames = false
     private var scrubbingFrameDisposable: Disposable?
     
-    private var isPlaying = false
     private let isPlayingPromise = ValuePromise<Bool>(false, ignoreRepeated: true)
     private let isInteractingPromise = ValuePromise<Bool>(false, ignoreRepeated: true)
     private let controlsVisiblePromise = ValuePromise<Bool>(true, ignoreRepeated: true)
@@ -814,8 +798,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         
         super.init()
 
-        self.clipsToBounds = true
-        
         self.moreBarButton.addTarget(self, action: #selector(self.moreButtonPressed), forControlEvents: .touchUpInside)
         
         self.footerContentNode.interacting = { [weak self] value in
@@ -968,12 +950,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         return self._ready.get()
     }
     
-    
-    override func screenFrameUpdated(_ frame: CGRect) {
-        let center = frame.midX - self.frame.width / 2.0
-        self.subnodeTransform = CATransform3DMakeTranslation(-center * 0.16, 0.0, 0.0)
-    }
-    
     override func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
         if let _ = self.customUnembedWhenPortrait, layout.size.width < layout.size.height {
             self.expandIntoCustomPiP()
@@ -999,8 +975,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         
         if let pictureInPictureNode = self.pictureInPictureNode {
             if let item = self.item {
-                var placeholderSize = item.content.dimensions.fitted(layout.size)
-                placeholderSize.height += 2.0
+                let placeholderSize = item.content.dimensions.fitted(layout.size)
                 transition.updateFrame(node: pictureInPictureNode, frame: CGRect(origin: CGPoint(x: floor((layout.size.width - placeholderSize.width) / 2.0), y: floor((layout.size.height - placeholderSize.height) / 2.0)), size: placeholderSize))
                 pictureInPictureNode.updateLayout(placeholderSize, transition: transition)
             }
@@ -1014,15 +989,11 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
     func setupItem(_ item: UniversalVideoGalleryItem) {
         if self.item?.content.id != item.content.id {
             func parseChapters(_ string: NSAttributedString) -> [MediaPlayerScrubbingChapter] {
-                var existingTimecodes = Set<Double>()
                 var timecodeRanges: [(NSRange, TelegramTimecode)] = []
                 var lineRanges: [NSRange] = []
                 string.enumerateAttributes(in: NSMakeRange(0, string.length), options: [], using: { attributes, range, _ in
                     if let timecode = attributes[NSAttributedString.Key(TelegramTextAttributes.Timecode)] as? TelegramTimecode {
-                        if !existingTimecodes.contains(timecode.time) {
-                            timecodeRanges.append((range, timecode))
-                            existingTimecodes.insert(timecode.time)
-                        }
+                        timecodeRanges.append((range, timecode))
                     }
                 })
                 (string.string as NSString).enumerateSubstrings(in: NSMakeRange(0, string.length), options: .byLines, using: { _, range, _, _ in
@@ -1033,7 +1004,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                 for (timecodeRange, timecode) in timecodeRanges {
                     inner: for lineRange in lineRanges {
                         if lineRange.contains(timecodeRange.location) {
-                            if lineRange.length > timecodeRange.length && timecodeRange.location < lineRange.location + 4 {
+                            if lineRange.length > timecodeRange.length {
                                 var title = ((string.string as NSString).substring(with: lineRange) as NSString).replacingCharacters(in: NSMakeRange(timecodeRange.location - lineRange.location, timecodeRange.length), with: "")
                                 title = title.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: .punctuationCharacters)
                                 chapters.append(MediaPlayerScrubbingChapter(title: title, start: timecode.time))
@@ -1042,7 +1013,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                         }
                     }
                 }
-                
                 return chapters
             }
             
@@ -1080,7 +1050,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             }
             self.footerContentNode.scrubberView = scrubberView
             
-            self.isPlaying = false
             self.isPlayingPromise.set(false)
             
             if item.hideControls {
@@ -1175,11 +1144,11 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             self.videoNode = videoNode
             self.videoNodeUserInteractionEnabled = disablePlayerControls || forceEnableUserInteraction
             videoNode.isUserInteractionEnabled = disablePlayerControls || forceEnableUserInteraction
-            videoNode.backgroundColor = UIColor.black
+            videoNode.backgroundColor = videoNode.ownsContentNode ? UIColor.black : UIColor(rgb: 0x333335)
             if item.fromPlayingVideo {
                 videoNode.canAttachContent = false
             } else {
-                self.updateDisplayPlaceholder()
+                self.updateDisplayPlaceholder(!videoNode.ownsContentNode)
             }
             
             scrubberView.setStatusSignal(videoNode.status |> map { value -> MediaPlayerStatus in
@@ -1361,7 +1330,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                                     }
                                 } else if strongSelf.actionAtEnd == .stop {
                                     strongSelf.isPlayingPromise.set(false)
-                                    strongSelf.isPlaying = false
                                     if strongSelf.isCentral == true {
                                         strongSelf.updateControlsVisibility(true)
                                     }
@@ -1374,10 +1342,8 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                     
                     if !disablePlayerControls && strongSelf.isCentral == true && isPlaying {
                         strongSelf.isPlayingPromise.set(true)
-                        strongSelf.isPlaying = true
                     } else if !isPlaying {
                         strongSelf.isPlayingPromise.set(false)
-                        strongSelf.isPlaying = false
                     }
                     
                     var fetching = false
@@ -1419,7 +1385,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                     
                     if isAnimated || disablePlayerControls {
                         strongSelf.footerContentNode.content = .info
-                    } else if isPaused && !strongSelf.ignorePauseStatus && strongSelf.isCentral == true {
+                    } else if isPaused && !strongSelf.ignorePauseStatus {
                         if hasStarted || strongSelf.didPause {
                             strongSelf.footerContentNode.content = .playback(paused: true, seekable: seekable)
                         } else if let fetchStatus = fetchStatus, !strongSelf.requiresDownload {
@@ -1489,7 +1455,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                                                 
                         if strongSelf.actionAtEnd == .stop && strongSelf.isCentral == true {
                             strongSelf.isPlayingPromise.set(false)
-                            strongSelf.isPlaying = false
                             strongSelf.updateControlsVisibility(true)
                         }
                     }
@@ -1527,25 +1492,21 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         self.videoNode?.notifyPlaybackControlsHidden(!isVisible)
     }
     
-    private func updateDisplayPlaceholder() {
-        self.updateDisplayPlaceholder(!(self.videoNode?.ownsContentNode ?? true) || self.isAirPlayActive)
-    }
-    
     private func updateDisplayPlaceholder(_ displayPlaceholder: Bool) {
         if displayPlaceholder && !self.disablePictureInPicturePlaceholder {
             if self.pictureInPictureNode == nil {
-                let pictureInPictureNode = UniversalVideoGalleryItemPictureInPictureNode(strings: self.presentationData.strings, mode: self.isAirPlayActive ? .airplay : .pictureInPicture)
+                let pictureInPictureNode = UniversalVideoGalleryItemPictureInPictureNode(strings: self.presentationData.strings)
                 pictureInPictureNode.isUserInteractionEnabled = false
                 self.pictureInPictureNode = pictureInPictureNode
                 self.insertSubnode(pictureInPictureNode, aboveSubnode: self.scrollNode)
                 if let validLayout = self.validLayout {
                     if let item = self.item {
-                        var placeholderSize = item.content.dimensions.fitted(validLayout.0.size)
-                        placeholderSize.height += 2.0
-                        pictureInPictureNode.frame = CGRect(origin: CGPoint(x: floor((validLayout.0.size.width - placeholderSize.width) / 2.0), y: floorToScreenPixels((validLayout.0.size.height - placeholderSize.height) / 2.0)), size: placeholderSize)
+                        let placeholderSize = item.content.dimensions.fitted(validLayout.0.size)
+                        pictureInPictureNode.frame = CGRect(origin: CGPoint(x: floor((validLayout.0.size.width - placeholderSize.width) / 2.0), y: floor((validLayout.0.size.height - placeholderSize.height) / 2.0)), size: placeholderSize)
                         pictureInPictureNode.updateLayout(placeholderSize, transition: .immediate)
                     }
                 }
+                self.videoNode?.backgroundColor = UIColor(rgb: 0x333335)
             }
         } else if let pictureInPictureNode = self.pictureInPictureNode {
             self.pictureInPictureNode = nil
@@ -1610,7 +1571,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                     }
                 } else {
                     self.isPlayingPromise.set(false)
-                    self.isPlaying = false
                     
                     self.dismissOnOrientationChange = false
                     if videoNode.ownsContentNode {
@@ -1642,10 +1602,10 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                     } else {
                         videoNode.continuePlayingWithoutSound()
                     }
-                    self.updateDisplayPlaceholder()
+                    self.updateDisplayPlaceholder(!videoNode.ownsContentNode)
                 } else if !item.fromPlayingVideo {
                     videoNode.canAttachContent = isVisible
-                    self.updateDisplayPlaceholder()
+                    self.updateDisplayPlaceholder(!videoNode.ownsContentNode)
                 }
                 if self.shouldAutoplayOnCentrality() {
                     self.hideStatusNodeUntilCentrality = true
@@ -1730,7 +1690,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             videoNode.layer.animate(from: NSValue(caTransform3D: transform), to: NSValue(caTransform3D: videoNode.layer.transform), keyPath: "transform", timingFunction: kCAMediaTimingFunctionSpring, duration: 0.25)
             
             videoNode.canAttachContent = true
-            self.updateDisplayPlaceholder()
+            self.updateDisplayPlaceholder(!videoNode.ownsContentNode)
             
             self.context.sharedContext.mediaManager.setOverlayVideoNode(nil)
         } else {
@@ -1808,7 +1768,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             if self.item?.fromPlayingVideo ?? false {
                 Queue.mainQueue().after(0.001) {
                     videoNode.canAttachContent = true
-                    self.updateDisplayPlaceholder()
+                    self.updateDisplayPlaceholder(!videoNode.ownsContentNode)
                 }
             }
             
@@ -2496,16 +2456,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
 
                 c.setItems(strongSelf.contextMenuSpeedItems() |> map { ContextController.Items(content: .list($0)) }, minHeight: nil)
             })))
-
-//            if #available(iOS 11.0, *) {
-//                items.append(.action(ContextMenuActionItem(text: "AirPlay", textColor: .primary, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: "Media Gallery/AirPlay"), color: theme.contextMenu.primaryColor) }, action: { [weak self] _, f in
-//                    f(.default)
-//                    guard let strongSelf = self else {
-//                        return
-//                    }
-//                    strongSelf.beginAirPlaySetup()
-//                })))
-//            }
             
             if let (message, _, _) = strongSelf.contentInfo() {
                 for media in message.media {
@@ -2628,67 +2578,43 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             return items
         }
     }
-    
-    private var isAirPlayActive = false
-    private var externalVideoPlayer: ExternalVideoPlayer?
-    func beginAirPlaySetup() {
-        guard let content = self.item?.content as? NativeVideoContent else {
-            return
-        }
-        if #available(iOS 11.0, *) {
-            self.externalVideoPlayer = ExternalVideoPlayer(context: self.context, content: content)
-            self.externalVideoPlayer?.openRouteSelection()
-            self.externalVideoPlayer?.isActiveUpdated = { [weak self] isActive in
-                if let strongSelf = self {
-                    if strongSelf.isAirPlayActive && !isActive {
-                        strongSelf.externalVideoPlayer = nil
-                    }
-                    strongSelf.isAirPlayActive = isActive
-                    strongSelf.updateDisplayPlaceholder()
-                }
-            }
-        }
-    }
 
     @objc func openStickersButtonPressed() {
-        guard let content = self.item?.content as? NativeVideoContent else {
-            return
-        }
-        let context = self.context
-        let media = content.fileReference.abstract
+        if let content = self.item?.content as? NativeVideoContent {
+            let context = self.context
+            let media = content.fileReference.abstract
 
-        let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
-        let topController = (self.baseNavigationController()?.topViewController as? ViewController)
-        let progressSignal = Signal<Never, NoError> { subscriber in
-            let controller = OverlayStatusController(theme: presentationData.theme, type: .loading(cancelled: nil))
-            topController?.present(controller, in: .window(.root), with: nil)
-            return ActionDisposable { [weak controller] in
-                Queue.mainQueue().async() {
-                    controller?.dismiss()
+            let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
+            let topController = (self.baseNavigationController()?.topViewController as? ViewController)
+            let progressSignal = Signal<Never, NoError> { subscriber in
+                let controller = OverlayStatusController(theme: presentationData.theme, type: .loading(cancelled: nil))
+                topController?.present(controller, in: .window(.root), with: nil)
+                return ActionDisposable { [weak controller] in
+                    Queue.mainQueue().async() {
+                        controller?.dismiss()
+                    }
                 }
             }
-        }
-        |> runOn(Queue.mainQueue())
-        |> delay(0.15, queue: Queue.mainQueue())
-        let progressDisposable = progressSignal.start()
-        
-        self.isInteractingPromise.set(true)
-        
-        let signal = self.context.engine.stickers.stickerPacksAttachedToMedia(media: media)
-        |> afterDisposed {
-            Queue.mainQueue().async {
-                progressDisposable.dispose()
+            |> runOn(Queue.mainQueue())
+            |> delay(0.15, queue: Queue.mainQueue())
+            let progressDisposable = progressSignal.start()
+            
+            self.isInteractingPromise.set(true)
+            
+            let signal = self.context.engine.stickers.stickerPacksAttachedToMedia(media: media)
+            |> afterDisposed {
+                Queue.mainQueue().async {
+                    progressDisposable.dispose()
+                }
             }
-        }
-        let _ = (signal
-        |> deliverOnMainQueue).start(next: { [weak self] packs in
-            guard let strongSelf = self, !packs.isEmpty else {
-                return
-            }
-            let baseNavigationController = strongSelf.baseNavigationController()
-            baseNavigationController?.view.endEditing(true)
-            let controller = StickerPackScreen(context: strongSelf.context, mainStickerPack: packs[0], stickerPacks: Array(packs.prefix(1)), sendSticker: nil, actionPerformed: { actions in
-                if let (info, items, action) = actions.first {
+            let _ = (signal
+            |> deliverOnMainQueue).start(next: { [weak self] packs in
+                guard let strongSelf = self, !packs.isEmpty else {
+                    return
+                }
+                let baseNavigationController = strongSelf.baseNavigationController()
+                baseNavigationController?.view.endEditing(true)
+                let controller = StickerPackScreen(context: strongSelf.context, mainStickerPack: packs[0], stickerPacks: packs, sendSticker: nil, actionPerformed: { info, items, action in
                     let animateInAsReplacement = false
                     switch action {
                     case .add:
@@ -2703,12 +2629,12 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                             return true
                         }), in: .window(.root))
                     }
-                }
-            }, dismissed: { [weak self] in
-                self?.isInteractingPromise.set(false)
+                }, dismissed: { [weak self] in
+                    self?.isInteractingPromise.set(false)
+                })
+                (baseNavigationController?.topViewController as? ViewController)?.present(controller, in: .window(.root), with: nil)
             })
-            (baseNavigationController?.topViewController as? ViewController)?.present(controller, in: .window(.root), with: nil)
-        })
+        }
     }
     
     override func adjustForPreviewing() {
@@ -2729,78 +2655,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         }
 
         self.playbackRatePromise.set(self.playbackRate ?? 1.0)
-    }
-    
-    override var keyShortcuts: [KeyShortcut] {
-        let strings = self.presentationData.strings
-        
-        var keyShortcuts: [KeyShortcut] = []
-        keyShortcuts.append(
-            KeyShortcut(
-                title: self.isPlaying ? strings.KeyCommand_Pause : strings.KeyCommand_Play,
-                input: " ",
-                modifiers: [],
-                action: { [weak self] in
-                    self?.footerContentNode.playbackControl?()
-                }
-            )
-        )
-        
-        keyShortcuts.append(
-            KeyShortcut(
-                title: strings.KeyCommand_SeekBackward,
-                input: UIKeyCommand.inputLeftArrow,
-                modifiers: [.shift],
-                action: { [weak self] in
-                    self?.footerContentNode.seekBackward?(5)
-                }
-            )
-        )
-        keyShortcuts.append(
-            KeyShortcut(
-                title: strings.KeyCommand_SeekForward,
-                input: UIKeyCommand.inputRightArrow,
-                modifiers: [.shift],
-                action: { [weak self] in
-                    self?.footerContentNode.seekForward?(5)
-                }
-            )
-        )
-        
-        keyShortcuts.append(
-            KeyShortcut(
-                title: strings.KeyCommand_Share,
-                input: "S",
-                modifiers: [.command],
-                action: { [weak self] in
-                    self?.footerContentNode.actionButtonPressed()
-                }
-            )
-        )
-        if self.hasPictureInPicture {
-            keyShortcuts.append(
-                KeyShortcut(
-                    title: strings.KeyCommand_SwitchToPIP,
-                    input: "P",
-                    modifiers: [.command],
-                    action: { [weak self] in
-                        self?.pictureInPictureButtonPressed()
-                    }
-                )
-            )
-        }
-        if self.canDelete() {
-            keyShortcuts.append(
-                KeyShortcut(
-                    input: "\u{8}",
-                    modifiers: [],
-                    action: { [weak self] in
-                        self?.footerContentNode.deleteButtonPressed()
-                    }
-                )
-            )
-        }
-        return keyShortcuts
     }
 }
 

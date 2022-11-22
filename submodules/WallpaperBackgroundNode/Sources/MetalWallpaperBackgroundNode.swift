@@ -64,7 +64,6 @@ private func makePipelineState(device: MTLDevice, library: MTLLibrary, vertexPro
     return pipelineState
 }
 
-
 @available(iOS 13.0, *)
 final class MetalWallpaperBackgroundNode: ASDisplayNode, WallpaperBackgroundNode {
     private let device: MTLDevice
@@ -283,19 +282,11 @@ final class MetalWallpaperBackgroundNode: ASDisplayNode, WallpaperBackgroundNode
         
     }
     
-    func updateIsLooping(_ isLooping: Bool) {
-
-    }
-    
     func updateBubbleTheme(bubbleTheme: PresentationTheme, bubbleCorners: PresentationChatBubbleCorners) {
         
     }
     
     func hasBubbleBackground(for type: WallpaperBubbleType) -> Bool {
-        return false
-    }
-    
-    func hasExtraBubbleBackground() -> Bool {
         return false
     }
     

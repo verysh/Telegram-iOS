@@ -6,12 +6,12 @@ private class GridNodeScrollerLayer: CALayer {
     }
 }
 
-public class GridNodeScrollerView: UIScrollView {
-    override public class var layerClass: AnyClass {
+private class GridNodeScrollerView: UIScrollView {
+    override class var layerClass: AnyClass {
         return GridNodeScrollerLayer.self
     }
     
-    override public init(frame: CGRect) {
+    override init(frame: CGRect) {
         super.init(frame: frame)
         
         if #available(iOSApplicationExtension 11.0, iOS 11.0, *) {
@@ -19,15 +19,15 @@ public class GridNodeScrollerView: UIScrollView {
         }
     }
     
-    required public init?(coder aDecoder: NSCoder) {
+    required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
     
-    override public func touchesShouldCancel(in view: UIView) -> Bool {
+    override func touchesShouldCancel(in view: UIView) -> Bool {
         return true
     }
     
-    @objc private func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+    @objc func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         return false
     }
 }

@@ -138,7 +138,7 @@ class StickerPanePeerSpecificSetupGridItemNode: GridItemNode {
         var updateButtonBackgroundImage: UIImage?
         if currentItem?.theme !== item.theme {
             updateButtonBackgroundImage = PresentationResourcesChat.chatInputMediaPanelAddPackButtonImage(item.theme)
-            self.dismissButtonNode.setImage(PresentationResourcesChat.chatInputMediaPanelGridDismissImage(item.theme, color: item.theme.chat.inputMediaPanel.stickersSectionTextColor), for: [])
+            self.dismissButtonNode.setImage(PresentationResourcesChat.chatInputMediaPanelGridDismissImage(item.theme), for: [])
         }
         
         let leftInset: CGFloat = 12.0

@@ -1,7 +1,7 @@
 import Foundation
 import UIKit
 
-final class ChildWindowHostView: UIView, WindowHost {
+private final class ChildWindowHostView: UIView, WindowHost {
     var updateSize: ((CGSize) -> Void)?
     var layoutSubviewsEvent: (() -> Void)?
     var hitTestImpl: ((CGPoint, UIEvent?) -> UIView?)?
@@ -56,7 +56,6 @@ final class ChildWindowHostView: UIView, WindowHost {
     }
     
     func presentInGlobalOverlay(_ controller: ContainableController) {
-        self.presentController?(controller, .root, true, {})
     }
     
     func addGlobalPortalHostView(sourceView: PortalSourceView) {

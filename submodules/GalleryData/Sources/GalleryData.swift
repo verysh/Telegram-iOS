@@ -98,21 +98,8 @@ public func chatMessageGalleryControllerData(context: AccountContext, chatLocati
     var galleryMedia: Media?
     var otherMedia: Media?
     var instantPageMedia: (TelegramMediaWebpage, [InstantPageGalleryEntry])?
-    if message.media.isEmpty, let entities = message.textEntitiesAttribute?.entities, entities.count == 1, let firstEntity = entities.first, case let .CustomEmoji(_, fileId) = firstEntity.type, let file = message.associatedMedia[MediaId(namespace: Namespaces.Media.CloudFile, id: fileId)] as? TelegramMediaFile {
-        for attribute in file.attributes {
-            if case let .CustomEmoji(_, _, reference) = attribute {
-                if let reference = reference {
-                    return .stickerPack(reference)
-                }
-                break
-            }
-        }
-    }
     for media in message.media {
-        if let invoice = media as? TelegramMediaInvoice, let extendedMedia = invoice.extendedMedia, case let .full(fullMedia) = extendedMedia {
-            standalone = true
-            galleryMedia = fullMedia
-        } else if let action = media as? TelegramMediaAction {
+        if let action = media as? TelegramMediaAction {
             switch action.action {
             case let .photoUpdated(image):
                 if let peer = messageMainPeer(EngineMessage(message)), let image = image {

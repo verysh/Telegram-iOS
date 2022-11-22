@@ -8,7 +8,6 @@ private class AdMessagesHistoryContextImpl {
         enum CodingKeys: String, CodingKey {
             case opaqueId
             case messageType
-            case displayAvatar
             case text
             case textEntities
             case media
@@ -66,7 +65,6 @@ private class AdMessagesHistoryContextImpl {
 
         public let opaqueId: Data
         public let messageType: MessageType
-        public let displayAvatar: Bool
         public let text: String
         public let textEntities: [MessageTextEntity]
         public let media: [Media]
@@ -77,7 +75,6 @@ private class AdMessagesHistoryContextImpl {
         public init(
             opaqueId: Data,
             messageType: MessageType,
-            displayAvatar: Bool,
             text: String,
             textEntities: [MessageTextEntity],
             media: [Media],
@@ -87,7 +84,6 @@ private class AdMessagesHistoryContextImpl {
         ) {
             self.opaqueId = opaqueId
             self.messageType = messageType
-            self.displayAvatar = displayAvatar
             self.text = text
             self.textEntities = textEntities
             self.media = media
@@ -107,8 +103,6 @@ private class AdMessagesHistoryContextImpl {
                 self.messageType = .sponsored
             }
             
-            self.displayAvatar = try container.decodeIfPresent(Bool.self, forKey: .displayAvatar) ?? false
-            
             self.text = try container.decode(String.self, forKey: .text)
             self.textEntities = try container.decode([MessageTextEntity].self, forKey: .textEntities)
 
@@ -127,7 +121,6 @@ private class AdMessagesHistoryContextImpl {
 
             try container.encode(self.opaqueId, forKey: .opaqueId)
             try container.encode(self.messageType.rawValue, forKey: .messageType)
-            try container.encode(self.displayAvatar, forKey: .displayAvatar)
             try container.encode(self.text, forKey: .text)
             try container.encode(self.textEntities, forKey: .textEntities)
 
@@ -193,7 +186,7 @@ private class AdMessagesHistoryContextImpl {
             case .recommended:
                 mappedMessageType = .recommended
             }
-            attributes.append(AdMessageAttribute(opaqueId: self.opaqueId, messageType: mappedMessageType, displayAvatar: self.displayAvatar, target: target))
+            attributes.append(AdMessageAttribute(opaqueId: self.opaqueId, messageType: mappedMessageType, target: target))
             if !self.textEntities.isEmpty {
                 let attribute = TextEntitiesMessageAttribute(entities: self.textEntities)
                 attributes.append(attribute)
@@ -228,8 +221,7 @@ private class AdMessagesHistoryContextImpl {
                     restrictionInfo: nil,
                     adminRights: nil,
                     bannedRights: nil,
-                    defaultBannedRights: nil,
-                    usernames: []
+                    defaultBannedRights: nil
                 )
             }
             
@@ -255,9 +247,7 @@ private class AdMessagesHistoryContextImpl {
                 media: self.media,
                 peers: messagePeers,
                 associatedMessages: SimpleDictionary<MessageId, Message>(),
-                associatedMessageIds: [],
-                associatedMedia: [:],
-                associatedThreadInfo: nil
+                associatedMessageIds: []
             )
         }
     }
@@ -271,17 +261,14 @@ private class AdMessagesHistoryContextImpl {
     struct CachedState: Codable, PostboxCoding {
         enum CodingKeys: String, CodingKey {
             case timestamp
-            case interPostInterval
             case messages
         }
 
         var timestamp: Int32
-        var interPostInterval: Int32?
         var messages: [CachedMessage]
 
-        init(timestamp: Int32, interPostInterval: Int32?, messages: [CachedMessage]) {
+        init(timestamp: Int32, messages: [CachedMessage]) {
             self.timestamp = timestamp
-            self.interPostInterval = interPostInterval
             self.messages = messages
         }
 
@@ -289,7 +276,6 @@ private class AdMessagesHistoryContextImpl {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
             self.timestamp = try container.decode(Int32.self, forKey: .timestamp)
-            self.interPostInterval = try container.decodeIfPresent(Int32.self, forKey: .interPostInterval)
             self.messages = try container.decode([CachedMessage].self, forKey: .messages)
         }
 
@@ -297,13 +283,11 @@ private class AdMessagesHistoryContextImpl {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(self.timestamp, forKey: .timestamp)
-            try container.encodeIfPresent(self.interPostInterval, forKey: .interPostInterval)
             try container.encode(self.messages, forKey: .messages)
         }
 
         init(decoder: PostboxDecoder) {
             self.timestamp = decoder.decodeInt32ForKey("timestamp", orElse: 0)
-            self.interPostInterval = decoder.decodeOptionalInt32ForKey("interPostInterval")
             if let messagesData = decoder.decodeOptionalDataArrayForKey("messages") {
                 self.messages = messagesData.compactMap { data -> CachedMessage? in
                     return try? AdaptedPostboxDecoder().decode(CachedMessage.self, from: data)
@@ -315,11 +299,6 @@ private class AdMessagesHistoryContextImpl {
 
         func encode(_ encoder: PostboxEncoder) {
             encoder.encodeInt32(self.timestamp, forKey: "timestamp")
-            if let interPostInterval = self.interPostInterval {
-                encoder.encodeInt32(interPostInterval, forKey: "interPostInterval")
-            } else {
-                encoder.encodeNil(forKey: "interPostInterval")
-            }
             encoder.encodeDataArray(self.messages.compactMap { message -> Data? in
                 return try? AdaptedPostboxEncoder().encode(message)
             }, forKey: "messages")
@@ -350,13 +329,9 @@ private class AdMessagesHistoryContextImpl {
     }
     
     struct State: Equatable {
-        var interPostInterval: Int32?
         var messages: [Message]
 
         static func ==(lhs: State, rhs: State) -> Bool {
-            if lhs.interPostInterval != rhs.interPostInterval {
-                return false
-            }
             if lhs.messages.count != rhs.messages.count {
                 return false
             }
@@ -388,43 +363,43 @@ private class AdMessagesHistoryContextImpl {
         self.account = account
         self.peerId = peerId
 
-        self.stateValue = State(interPostInterval: nil, messages: [])
+        self.stateValue = State(messages: [])
 
         self.state.set(CachedState.getCached(postbox: account.postbox, peerId: peerId)
         |> mapToSignal { cachedState -> Signal<State, NoError> in
             if let cachedState = cachedState, cachedState.timestamp >= Int32(Date().timeIntervalSince1970) - 5 * 60 {
                 return account.postbox.transaction { transaction -> State in
-                    return State(interPostInterval: cachedState.interPostInterval, messages: cachedState.messages.compactMap { message -> Message? in
+                    return State(messages: cachedState.messages.compactMap { message -> Message? in
                         return message.toMessage(peerId: peerId, transaction: transaction)
                     })
                 }
             } else {
-                return .single(State(interPostInterval: nil, messages: []))
+                return .single(State(messages: []))
             }
         })
 
-        let signal: Signal<(interPostInterval: Int32?, messages: [Message]), NoError> = account.postbox.transaction { transaction -> Api.InputChannel? in
+        let signal: Signal<[Message], NoError> = account.postbox.transaction { transaction -> Api.InputChannel? in
             return transaction.getPeer(peerId).flatMap(apiInputChannel)
         }
-        |> mapToSignal { inputChannel -> Signal<(interPostInterval: Int32?, messages: [Message]), NoError> in
+        |> mapToSignal { inputChannel -> Signal<[Message], NoError> in
             guard let inputChannel = inputChannel else {
-                return .single((nil, []))
+                return .single([])
             }
             return account.network.request(Api.functions.channels.getSponsoredMessages(channel: inputChannel))
             |> map(Optional.init)
             |> `catch` { _ -> Signal<Api.messages.SponsoredMessages?, NoError> in
                 return .single(nil)
             }
-            |> mapToSignal { result -> Signal<(interPostInterval: Int32?, messages: [Message]), NoError> in
+            |> mapToSignal { result -> Signal<[Message], NoError> in
                 guard let result = result else {
-                    return .single((nil, []))
+                    return .single([])
                 }
 
-                return account.postbox.transaction { transaction -> (interPostInterval: Int32?, messages: [Message]) in
+                return account.postbox.transaction { transaction -> [Message] in
                     switch result {
-                    case let .sponsoredMessages(_, postsBetween, messages, chats, users):
+                    case let .sponsoredMessages(messages, chats, users):
                         var peers: [Peer] = []
-                        var peerPresences: [PeerId: Api.User] = [:]
+                        var peerPresences: [PeerId: PeerPresence] = [:]
 
                         for chat in chats {
                             if let groupOrChannel = parseTelegramGroupOrChannel(chat: chat) {
@@ -434,7 +409,9 @@ private class AdMessagesHistoryContextImpl {
                         for user in users {
                             let telegramUser = TelegramUser(user: user)
                             peers.append(telegramUser)
-                            peerPresences[telegramUser.id] = user
+                            if let presence = TelegramUserPresence(apiUser: user) {
+                                peerPresences[telegramUser.id] = presence
+                            }
                         }
 
                         updatePeers(transaction: transaction, peers: peers, update: { _, updated -> Peer in
@@ -454,7 +431,6 @@ private class AdMessagesHistoryContextImpl {
                                 }
                                 
                                 let isRecommended = (flags & (1 << 5)) != 0
-                                let displayAvatar = (flags & (1 << 6)) != 0
                                 
                                 let _ = chatInvite
                                 let _ = chatInviteHash
@@ -503,7 +479,6 @@ private class AdMessagesHistoryContextImpl {
                                     parsedMessages.append(CachedMessage(
                                         opaqueId: randomId.makeData(),
                                         messageType: isRecommended ? .recommended : .sponsored,
-                                        displayAvatar: displayAvatar,
                                         text: message,
                                         textEntities: parsedEntities,
                                         media: [],
@@ -515,24 +490,22 @@ private class AdMessagesHistoryContextImpl {
                             }
                         }
 
-                        CachedState.setCached(transaction: transaction, peerId: peerId, state: CachedState(timestamp: Int32(Date().timeIntervalSince1970), interPostInterval: postsBetween, messages: parsedMessages))
+                        CachedState.setCached(transaction: transaction, peerId: peerId, state: CachedState(timestamp: Int32(Date().timeIntervalSince1970), messages: parsedMessages))
 
-                        return (postsBetween, parsedMessages.compactMap { message -> Message? in
+                        return parsedMessages.compactMap { message -> Message? in
                             return message.toMessage(peerId: peerId, transaction: transaction)
-                        })
-                    case .sponsoredMessagesEmpty:
-                        return (nil, [])
+                        }
                     }
                 }
             }
         }
         
         self.disposable.set((signal
-        |> deliverOn(self.queue)).start(next: { [weak self] interPostInterval, messages in
+        |> deliverOn(self.queue)).start(next: { [weak self] messages in
             guard let strongSelf = self else {
                 return
             }
-            strongSelf.stateValue = State(interPostInterval: interPostInterval, messages: messages)
+            strongSelf.stateValue = State(messages: messages)
         }))
     }
     
@@ -563,13 +536,13 @@ public class AdMessagesHistoryContext {
     private let queue = Queue()
     private let impl: QueueLocalObject<AdMessagesHistoryContextImpl>
     
-    public var state: Signal<(interPostInterval: Int32?, messages: [Message]), NoError> {
+    public var state: Signal<[Message], NoError> {
         return Signal { subscriber in
             let disposable = MetaDisposable()
             
             self.impl.with { impl in
                 let stateDisposable = impl.state.get().start(next: { state in
-                    subscriber.putNext((state.interPostInterval, state.messages))
+                    subscriber.putNext(state.messages)
                 })
                 disposable.set(stateDisposable)
             }

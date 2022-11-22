@@ -35,11 +35,6 @@ swift_library(
         "//submodules/SolidRoundedButtonNode:SolidRoundedButtonNode",
         "//submodules/PremiumUI:PremiumUI",
         "//submodules/OverlayStatusController:OverlayStatusController",
-        "//submodules/TelegramUI/Components/EntityKeyboard:EntityKeyboard",
-        "//submodules/TelegramUI/Components/AnimationCache:AnimationCache",
-        "//submodules/TelegramUI/Components/MultiAnimationRenderer:MultiAnimationRenderer",
-        "//submodules/StickerPeekUI:StickerPeekUI",
-        "//submodules/Pasteboard:Pasteboard",
     ],
     visibility = [
         "//visibility:public",

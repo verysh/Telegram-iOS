@@ -19,8 +19,6 @@ final class TooltipControllerNode: ASDisplayNode {
     var sourceRect: CGRect?
     var arrowOnBottom: Bool = true
     
-    var padding: CGFloat = 8.0
-    
     private var dismissedByTouchOutside = false
     private var dismissByTapOutsideSource = false
     
@@ -124,7 +122,7 @@ final class TooltipControllerNode: ASDisplayNode {
         }
         self.arrowOnBottom = arrowOnBottom
         
-        let horizontalOrigin: CGFloat = floor(min(max(self.padding, sourceRect.midX - contentSize.width / 2.0), layout.size.width - contentSize.width - self.padding))
+        let horizontalOrigin: CGFloat = floor(min(max(8.0, sourceRect.midX - contentSize.width / 2.0), layout.size.width - contentSize.width - 8.0))
         
         transition.updateFrame(node: self.containerNode, frame: CGRect(origin: CGPoint(x: horizontalOrigin, y: verticalOrigin), size: contentSize))
         self.containerNode.relativeArrowPosition = (sourceRect.midX - horizontalOrigin, arrowOnBottom)

@@ -416,7 +416,7 @@ private struct ChannelAdminControllerState: Equatable {
     }
 }
 
-private func stringForRight(strings: PresentationStrings, right: TelegramChatAdminRightsFlags, isGroup: Bool, isChannel: Bool, isForum: Bool, defaultBannedRights: TelegramChatBannedRights?) -> String {
+private func stringForRight(strings: PresentationStrings, right: TelegramChatAdminRightsFlags, isGroup: Bool, isChannel: Bool, defaultBannedRights: TelegramChatBannedRights?) -> String {
     if right.contains(.canChangeInfo) {
         return isGroup ? strings.Group_EditAdmin_PermissionChangeInfo : strings.Channel_EditAdmin_PermissionChangeInfo
     } else if right.contains(.canPostMessages) {
@@ -439,8 +439,6 @@ private func stringForRight(strings: PresentationStrings, right: TelegramChatAdm
         }
     } else if right.contains(.canPinMessages) {
         return strings.Channel_EditAdmin_PermissionPinMessages
-    } else if right.contains(.canManageTopics) {
-        return strings.Channel_EditAdmin_PermissionManageTopics
     } else if right.contains(.canAddAdmins) {
         return strings.Channel_EditAdmin_PermissionAddAdmins
     } else if right.contains(.canBeAnonymous) {
@@ -528,8 +526,12 @@ private func rightEnabledByDefault(channelPeer: Peer, right: TelegramChatAdminRi
     return false
 }
 
-private func areAllAdminRightsEnabled(_ flags: TelegramChatAdminRightsFlags, peer: EnginePeer, except: TelegramChatAdminRightsFlags) -> Bool {
-    return TelegramChatAdminRightsFlags.peerSpecific(peer: peer).subtracting(except).intersection(flags) == TelegramChatAdminRightsFlags.peerSpecific(peer: peer).subtracting(except)
+private func areAllAdminRightsEnabled(_ flags: TelegramChatAdminRightsFlags, group: Bool, except: TelegramChatAdminRightsFlags) -> Bool {
+    if group {
+        return TelegramChatAdminRightsFlags.groupSpecific.subtracting(except).intersection(flags) == TelegramChatAdminRightsFlags.groupSpecific.subtracting(except)
+    } else {
+        return TelegramChatAdminRightsFlags.broadcastSpecific.subtracting(except).intersection(flags) == TelegramChatAdminRightsFlags.broadcastSpecific.subtracting(except)
+    }
 }
 
 private func channelAdminControllerEntries(presentationData: PresentationData, state: ChannelAdminControllerState, accountPeerId: PeerId, channelPeer: EnginePeer?, adminPeer: EnginePeer?, adminPresence: EnginePeer.Presence?, initialParticipant: ChannelParticipant?, invite: Bool, canEdit: Bool) -> [ChannelAdminEntry] {
@@ -555,10 +557,10 @@ private func channelAdminControllerEntries(presentationData: PresentationData, s
         var maskRightsFlags: TelegramChatAdminRightsFlags
         let rightsOrder: [TelegramChatAdminRightsFlags]
         
-        maskRightsFlags = TelegramChatAdminRightsFlags.peerSpecific(peer: .channel(channel))
         switch channel.info {
             case .broadcast:
                 isGroup = false
+                maskRightsFlags = .broadcastSpecific
                 rightsOrder = [
                     .canChangeInfo,
                     .canPostMessages,
@@ -570,30 +572,17 @@ private func channelAdminControllerEntries(presentationData: PresentationData, s
                 ]
             case .group:
                 isGroup = true
-                if channel.flags.contains(.isForum) {
-                    rightsOrder = [
-                        .canChangeInfo,
-                        .canDeleteMessages,
-                        .canBanUsers,
-                        .canInviteUsers,
-                        .canPinMessages,
-                        .canManageTopics,
-                        .canManageCalls,
-                        .canBeAnonymous,
-                        .canAddAdmins
-                    ]
-                } else {
-                    rightsOrder = [
-                        .canChangeInfo,
-                        .canDeleteMessages,
-                        .canBanUsers,
-                        .canInviteUsers,
-                        .canPinMessages,
-                        .canManageCalls,
-                        .canBeAnonymous,
-                        .canAddAdmins
-                    ]
-                }
+                maskRightsFlags = .groupSpecific
+                rightsOrder = [
+                    .canChangeInfo,
+                    .canDeleteMessages,
+                    .canBanUsers,
+                    .canInviteUsers,
+                    .canPinMessages,
+                    .canManageCalls,
+                    .canBeAnonymous,
+                    .canAddAdmins
+                ]
         }
         
         if isCreator {
@@ -623,7 +612,7 @@ private func channelAdminControllerEntries(presentationData: PresentationData, s
                 var index = 0
                 for right in rightsOrder {
                     if accountUserRightsFlags.contains(right) {
-                        entries.append(.rightItem(presentationData.theme, index, stringForRight(strings: presentationData.strings, right: right, isGroup: isGroup, isChannel: isChannel, isForum: channel.flags.contains(.isForum), defaultBannedRights: channel.defaultBannedRights), right, currentRightsFlags, currentRightsFlags.contains(right), right == .canBeAnonymous))
+                        entries.append(.rightItem(presentationData.theme, index, stringForRight(strings: presentationData.strings, right: right, isGroup: isGroup, isChannel: isChannel, defaultBannedRights: channel.defaultBannedRights), right, currentRightsFlags, currentRightsFlags.contains(right), right == .canBeAnonymous))
                         index += 1
                     }
                 }
@@ -662,7 +651,7 @@ private func channelAdminControllerEntries(presentationData: PresentationData, s
                     var index = 0
                     for right in rightsOrder {
                         if accountUserRightsFlags.contains(right) {
-                            entries.append(.rightItem(presentationData.theme, index, stringForRight(strings: presentationData.strings, right: right, isGroup: isGroup, isChannel: isChannel, isForum: channel.flags.contains(.isForum), defaultBannedRights: channel.defaultBannedRights), right, currentRightsFlags, currentRightsFlags.contains(right), !state.updating && admin.id != accountPeerId && !rightEnabledByDefault(channelPeer: channel, right: right)))
+                            entries.append(.rightItem(presentationData.theme, index, stringForRight(strings: presentationData.strings, right: right, isGroup: isGroup, isChannel: isChannel, defaultBannedRights: channel.defaultBannedRights), right, currentRightsFlags, currentRightsFlags.contains(right), !state.updating && admin.id != accountPeerId && !rightEnabledByDefault(channelPeer: channel, right: right)))
                             index += 1
                         }
                     }
@@ -671,7 +660,7 @@ private func channelAdminControllerEntries(presentationData: PresentationData, s
                         entries.append(.addAdminsInfo(presentationData.theme, currentRightsFlags.contains(.canAddAdmins) ? presentationData.strings.Channel_EditAdmin_PermissinAddAdminOn : presentationData.strings.Channel_EditAdmin_PermissinAddAdminOff))
                     }
                     
-                    if case let .user(admin) = admin, admin.botInfo == nil && !admin.isDeleted && channel.flags.contains(.isCreator) && areAllAdminRightsEnabled(currentRightsFlags, peer: .channel(channel), except: .canBeAnonymous) {
+                    if case let .user(admin) = admin, admin.botInfo == nil && !admin.isDeleted && channel.flags.contains(.isCreator) && areAllAdminRightsEnabled(currentRightsFlags, group: isGroup, except: .canBeAnonymous) {
                         canTransfer = true
                     }
                 
@@ -694,7 +683,7 @@ private func channelAdminControllerEntries(presentationData: PresentationData, s
                 } else if let initialParticipant = initialParticipant, case let .member(_, _, maybeAdminInfo, _, _) = initialParticipant, let adminInfo = maybeAdminInfo {
                     var index = 0
                     for right in rightsOrder {
-                        entries.append(.rightItem(presentationData.theme, index, stringForRight(strings: presentationData.strings, right: right, isGroup: isGroup, isChannel: isChannel, isForum: channel.flags.contains(.isForum), defaultBannedRights: channel.defaultBannedRights), right, adminInfo.rights.rights, adminInfo.rights.rights.contains(right), false))
+                        entries.append(.rightItem(presentationData.theme, index, stringForRight(strings: presentationData.strings, right: right, isGroup: isGroup, isChannel: isChannel, defaultBannedRights: channel.defaultBannedRights), right, adminInfo.rights.rights, adminInfo.rights.rights.contains(right), false))
                         index += 1
                     }
                 }
@@ -762,7 +751,7 @@ private func channelAdminControllerEntries(presentationData: PresentationData, s
                 
                 let isGroup = true
                 let isChannel = false
-                let maskRightsFlags: TelegramChatAdminRightsFlags = TelegramChatAdminRightsFlags.peerSpecific(peer: .legacyGroup(group))
+                let maskRightsFlags: TelegramChatAdminRightsFlags = .groupSpecific
                 let rightsOrder: [TelegramChatAdminRightsFlags] = [
                     .canChangeInfo,
                     .canDeleteMessages,
@@ -793,7 +782,7 @@ private func channelAdminControllerEntries(presentationData: PresentationData, s
                 var index = 0
                 for right in rightsOrder {
                     if accountUserRightsFlags.contains(right) {
-                        entries.append(.rightItem(presentationData.theme, index, stringForRight(strings: presentationData.strings, right: right, isGroup: isGroup, isChannel: isChannel, isForum: false, defaultBannedRights: group.defaultBannedRights), right, currentRightsFlags, currentRightsFlags.contains(right), !state.updating && accountIsCreator))
+                        entries.append(.rightItem(presentationData.theme, index, stringForRight(strings: presentationData.strings, right: right, isGroup: isGroup, isChannel: isChannel, defaultBannedRights: group.defaultBannedRights), right, currentRightsFlags, currentRightsFlags.contains(right), !state.updating && accountIsCreator))
                         index += 1
                     }
                 }
@@ -802,7 +791,7 @@ private func channelAdminControllerEntries(presentationData: PresentationData, s
                     entries.append(.addAdminsInfo(presentationData.theme, currentRightsFlags.contains(.canAddAdmins) ? presentationData.strings.Channel_EditAdmin_PermissinAddAdminOn : presentationData.strings.Channel_EditAdmin_PermissinAddAdminOff))
                 }
             
-                if case let .user(admin) = admin, case .creator = group.role, admin.botInfo == nil && !admin.isDeleted && areAllAdminRightsEnabled(currentRightsFlags, peer: .legacyGroup(group), except: .canBeAnonymous) {
+                if case let .user(admin) = admin, case .creator = group.role, admin.botInfo == nil && !admin.isDeleted && areAllAdminRightsEnabled(currentRightsFlags, group: true, except: .canBeAnonymous) {
                     entries.append(.transfer(presentationData.theme, presentationData.strings.Group_EditAdmin_TransferOwnership))
                 }
                 
@@ -1068,7 +1057,13 @@ public func channelAdminController(context: AccountContext, updatedPresentationD
                         return
                     }
                     
-                    let maskRightsFlags: TelegramChatAdminRightsFlags = TelegramChatAdminRightsFlags.peerSpecific(peer: .channel(channel))
+                    let maskRightsFlags: TelegramChatAdminRightsFlags
+                    switch channel.info {
+                        case .broadcast:
+                            maskRightsFlags = .broadcastSpecific
+                        case .group:
+                            maskRightsFlags = .groupSpecific
+                    }
                     
                     var currentRank: String?
                     var currentFlags: TelegramChatAdminRightsFlags?
@@ -1176,7 +1171,13 @@ public func channelAdminController(context: AccountContext, updatedPresentationD
                     }
                     
                     if updateFlags == nil {
-                        let maskRightsFlags: TelegramChatAdminRightsFlags = TelegramChatAdminRightsFlags.peerSpecific(peer: .channel(channel))
+                        let maskRightsFlags: TelegramChatAdminRightsFlags
+                        switch channel.info {
+                            case .broadcast:
+                                maskRightsFlags = .broadcastSpecific
+                            case .group:
+                                maskRightsFlags = .groupSpecific
+                        }
                         
                         if channel.flags.contains(.isCreator) {
                             updateFlags = maskRightsFlags.subtracting([.canAddAdmins, .canBeAnonymous])
@@ -1230,7 +1231,7 @@ public func channelAdminController(context: AccountContext, updatedPresentationD
                         }))
                     }
                 }
-            } else if case let .legacyGroup(group) = channelPeer {
+            } else if case .legacyGroup = channelPeer {
                 var updateFlags: TelegramChatAdminRightsFlags?
                 var updateRank: String?
                 updateState { current in
@@ -1246,7 +1247,7 @@ public func channelAdminController(context: AccountContext, updatedPresentationD
                     return
                 }
                 
-                let maskRightsFlags: TelegramChatAdminRightsFlags = TelegramChatAdminRightsFlags.peerSpecific(peer: .legacyGroup(group))
+                let maskRightsFlags: TelegramChatAdminRightsFlags = .groupSpecific
                 let defaultFlags = maskRightsFlags.subtracting([.canBeAnonymous, .canAddAdmins])
                 
                 if updateFlags == nil {

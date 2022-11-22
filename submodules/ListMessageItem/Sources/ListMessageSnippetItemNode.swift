@@ -386,10 +386,6 @@ public final class ListMessageSnippetItemNode: ListMessageNode {
                                             title = NSAttributedString(string: urlString, font: titleFont, textColor: item.presentationData.theme.theme.list.itemPrimaryTextColor)
                                             
                                             iconText = NSAttributedString(string: "S", font: iconFont, textColor: UIColor.white)
-                                        } else if url.path.hasPrefix("/addemoji/") {
-                                            title = NSAttributedString(string: urlString, font: titleFont, textColor: item.presentationData.theme.theme.list.itemPrimaryTextColor)
-                                            
-                                            iconText = NSAttributedString(string: "E", font: iconFont, textColor: UIColor.white)
                                         } else {
                                             iconText = NSAttributedString(string: host[..<host.index(after: host.startIndex)].uppercased(), font: iconFont, textColor: UIColor.white)
                                             
@@ -436,8 +432,6 @@ public final class ListMessageSnippetItemNode: ListMessageNode {
                                         title = NSAttributedString(string: tempTitleString as String, font: titleFont, textColor: item.presentationData.theme.theme.list.itemPrimaryTextColor)
                                         if url.path.hasPrefix("/addstickers/") {
                                             iconText = NSAttributedString(string: "S", font: iconFont, textColor: UIColor.white)
-                                        } else if url.path.hasPrefix("/addemoji/") {
-                                            iconText = NSAttributedString(string: "E", font: iconFont, textColor: UIColor.white)
                                         } else {
                                             iconText = NSAttributedString(string: host[..<host.index(after: host.startIndex)].uppercased(), font: iconFont, textColor: UIColor.white)
                                         }
@@ -826,7 +820,7 @@ public final class ListMessageSnippetItemNode: ListMessageNode {
                                     item.interaction.openUrl(url, false, true, nil)
                                 }
                             }
-                        case .hold, .doubleTap, .secondaryTap:
+                        case .hold, .doubleTap:
                             break
                     }
                 }

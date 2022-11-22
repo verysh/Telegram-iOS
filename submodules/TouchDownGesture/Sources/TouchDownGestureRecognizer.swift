@@ -6,20 +6,12 @@ public class TouchDownGestureRecognizer: UIGestureRecognizer, UIGestureRecognize
     public var touchDown: (() -> Void)?
     
     private var touchLocation: CGPoint?
-    public var waitForTouchUp: (() -> Bool)?
-    private var isWaitingForTouchUp: Bool = false
+    public var waitForTouchUp = false
     
     override public init(target: Any?, action: Selector?) {
         super.init(target: target, action: action)
         
         self.delegate = self
-    }
-    
-    override public func reset() {
-        self.touchLocation = nil
-        self.isWaitingForTouchUp = false
-        
-        super.reset()
     }
     
     public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
@@ -29,8 +21,7 @@ public class TouchDownGestureRecognizer: UIGestureRecognizer, UIGestureRecognize
     override public func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
         super.touchesBegan(touches, with: event)
         
-        if let waitForTouchUp = self.waitForTouchUp, waitForTouchUp() {
-            self.isWaitingForTouchUp = true
+        if self.waitForTouchUp {
             if let touch = touches.first {
                 self.touchLocation = touch.location(in: self.view)
             }
@@ -58,9 +49,14 @@ public class TouchDownGestureRecognizer: UIGestureRecognizer, UIGestureRecognize
     override public func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
         super.touchesEnded(touches, with: event)
         
-        if let touchDown = self.touchDown, self.isWaitingForTouchUp {
-            self.isWaitingForTouchUp = false
+        if let touchDown = self.touchDown, self.waitForTouchUp {
             touchDown()
         }
+    }
+    
+    override public func reset() {
+        self.touchLocation = nil
+        
+        super.reset()
     }
 }

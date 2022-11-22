@@ -18,8 +18,8 @@ private func traceDeceleratingScrollView(_ view: UIView, at point: CGPoint) -> B
 }
 
 public final class PeekControllerGestureRecognizer: UIPanGestureRecognizer {
-    private let contentAtPoint: (CGPoint) -> Signal<(UIView, CGRect, PeekControllerContent)?, NoError>?
-    private let present: (PeekControllerContent, UIView, CGRect) -> ViewController?
+    private let contentAtPoint: (CGPoint) -> Signal<(ASDisplayNode, PeekControllerContent)?, NoError>?
+    private let present: (PeekControllerContent, ASDisplayNode) -> ViewController?
     private let updateContent: (PeekControllerContent?) -> Void
     private let activateBySingleTap: Bool
     public var checkSingleTapActivationAtPoint: ((CGPoint) -> Bool)?
@@ -29,16 +29,16 @@ public final class PeekControllerGestureRecognizer: UIPanGestureRecognizer {
     private var pressTimer: SwiftSignalKit.Timer?
     
     private let candidateContentDisposable = MetaDisposable()
-    private var candidateContent: (UIView, CGRect, PeekControllerContent)? {
+    private var candidateContent: (ASDisplayNode, PeekControllerContent)? {
         didSet {
-            self.updateContent(self.candidateContent?.2)
+            self.updateContent(self.candidateContent?.1)
         }
     }
     
     private var menuActivation: PeerControllerMenuActivation?
     private weak var presentedController: PeekController?
     
-    public init(contentAtPoint: @escaping (CGPoint) -> Signal<(UIView, CGRect, PeekControllerContent)?, NoError>?, present: @escaping (PeekControllerContent, UIView, CGRect) -> ViewController?, updateContent: @escaping (PeekControllerContent?) -> Void = { _ in }, activateBySingleTap: Bool = false) {
+    public init(contentAtPoint: @escaping (CGPoint) -> Signal<(ASDisplayNode, PeekControllerContent)?, NoError>?, present: @escaping (PeekControllerContent, ASDisplayNode) -> ViewController?, updateContent: @escaping (PeekControllerContent?) -> Void = { _ in }, activateBySingleTap: Bool = false) {
         self.contentAtPoint = contentAtPoint
         self.present = present
         self.updateContent = updateContent
@@ -254,21 +254,21 @@ public final class PeekControllerGestureRecognizer: UIPanGestureRecognizer {
                     }
                     //print("check received, will process: \(processResult), force: \(forceActivate), state: \(strongSelf.state)")
                     if processResult {
-                        if let (sourceView, sourceRect, content) = result {
+                        if let (sourceNode, content) = result {
                             if let currentContent = strongSelf.candidateContent {
-                                if !currentContent.2.isEqual(to: content) {
+                                if !currentContent.1.isEqual(to: content) {
                                     strongSelf.tapLocation = touchLocation
-                                    strongSelf.candidateContent = (sourceView, sourceRect, content)
+                                    strongSelf.candidateContent = (sourceNode, content)
                                     strongSelf.menuActivation = content.menuActivation()
                                     if let presentedController = strongSelf.presentedController, presentedController.isNodeLoaded {
-                                        presentedController.sourceView = {
-                                            return (sourceView, sourceRect)
+                                        presentedController.sourceNode = {
+                                            return sourceNode
                                         }
                                         (presentedController.displayNode as? PeekControllerNode)?.updateContent(content: content)
                                     }
                                 }
                             } else {
-                                if let presentedController = strongSelf.present(content, sourceView, sourceRect) {
+                                if let presentedController = strongSelf.present(content, sourceNode) {
                                     if let presentedController = presentedController as? PeekController {
                                         if forceActivate {
                                             strongSelf.candidateContent = nil
@@ -276,7 +276,7 @@ public final class PeekControllerGestureRecognizer: UIPanGestureRecognizer {
                                                 (presentedController.displayNode as? PeekControllerNode)?.activateMenu()
                                             }
                                         } else {
-                                            strongSelf.candidateContent = (sourceView, sourceRect, content)
+                                            strongSelf.candidateContent = (sourceNode, content)
                                             strongSelf.menuActivation = content.menuActivation()
                                             strongSelf.presentedController = presentedController
                                             

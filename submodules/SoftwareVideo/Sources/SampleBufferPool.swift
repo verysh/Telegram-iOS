@@ -18,6 +18,7 @@ public final class SampleBufferLayer {
     public let layer: AVSampleBufferDisplayLayer
     private let enqueue: (AVSampleBufferDisplayLayer) -> Void
     
+    
     public var isFreed: Bool = false
     fileprivate init(layer: AVSampleBufferDisplayLayer, enqueue: @escaping (AVSampleBufferDisplayLayer) -> Void) {
         self.layer = layer

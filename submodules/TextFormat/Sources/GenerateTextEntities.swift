@@ -8,8 +8,7 @@ private let whitelistedHosts: Set<String> = Set([
     "t.me",
     "telegram.me",
     "telegra.ph",
-    "telesco.pe",
-    "fragment.com"
+    "telesco.pe"
 ])
 
 private let dataDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType([.link]).rawValue)
@@ -146,6 +145,26 @@ private func commitEntity(_ utf16: String.UTF16View, _ type: CurrentEntityType, 
 
 public func generateChatInputTextEntities(_ text: NSAttributedString, maxAnimatedEmojisInText: Int? = nil) -> [MessageTextEntity] {
     var entities: [MessageTextEntity] = []
+    
+    if let maxAnimatedEmojisInText = maxAnimatedEmojisInText, maxAnimatedEmojisInText != 0 {
+        var count = 0
+        text.string.enumerateSubstrings(in: text.string.startIndex ..< text.string.endIndex, options: [.byComposedCharacterSequences], { substring, substringRange, _, stop in
+            if let substring = substring {
+                let emoji = substring.basicEmoji.0
+                
+                if !emoji.isEmpty && emoji.isSingleEmoji {
+                    let mappedRange = NSRange(substringRange, in: text.string)
+                    
+                    entities.append(MessageTextEntity(range: mappedRange.lowerBound ..< mappedRange.upperBound, type: .AnimatedEmoji(nil)))
+                    
+                    count += 1
+                    if count >= maxAnimatedEmojisInText {
+                        stop = true
+                    }
+                }
+            }
+        })
+    }
 
     text.enumerateAttributes(in: NSRange(location: 0, length: text.length), options: [], using: { attributes, range, _ in
         for (key, value) in attributes {
@@ -165,8 +184,6 @@ public func generateChatInputTextEntities(_ text: NSAttributedString, maxAnimate
                 entities.append(MessageTextEntity(range: range.lowerBound ..< range.upperBound, type: .TextUrl(url: value.url)))
             } else if key == ChatTextInputAttributes.spoiler {
                 entities.append(MessageTextEntity(range: range.lowerBound ..< range.upperBound, type: .Spoiler))
-            } else if key == ChatTextInputAttributes.customEmoji, let value = value as? ChatTextInputTextCustomEmojiAttribute {
-                entities.append(MessageTextEntity(range: range.lowerBound ..< range.upperBound, type: .CustomEmoji(stickerPack: nil, fileId: value.fileId)))
             }
         }
     })

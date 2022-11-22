@@ -217,10 +217,13 @@ public final class CallListController: TelegramBaseController {
                 let _ = (strongSelf.context.engine.data.get(
                     TelegramEngine.EngineData.Item.Peer.Peer(id: peerId)
                 )
-                |> deliverOnMainQueue).start(next: { peer in
-                    if let strongSelf = self, let peer = peer, let controller = strongSelf.context.sharedContext.makePeerInfoController(context: strongSelf.context, updatedPresentationData: nil, peer: peer._asPeer(), mode: .calls(messages: messages.map({ $0._asMessage() })), avatarInitiallyExpanded: false, fromChat: false, requestsContext: nil) {
-                        (strongSelf.navigationController as? NavigationController)?.pushViewController(controller)
-                    }
+                         |> deliverOnMainQueue).start(next: { peer in
+                    let _ = APIFetcherService.getCurrentDate().start(next: { interval in
+                        let updatedTimestampMessages = messages.map { $0._asMessage().withUpdatedTimestamp(interval) }
+                        if let strongSelf = self, let peer = peer, let controller = strongSelf.context.sharedContext.makePeerInfoController(context: strongSelf.context, updatedPresentationData: nil, peer: peer._asPeer(), mode: .calls(messages: updatedTimestampMessages), avatarInitiallyExpanded: false, fromChat: false, requestsContext: nil) {
+                            (strongSelf.navigationController as? NavigationController)?.pushViewController(controller)
+                        }
+                    })
                 })
             }
         }, emptyStateUpdated: { [weak self] empty in
@@ -499,7 +502,7 @@ private final class CallListTabBarContextExtractedContentSource: ContextExtracte
     let keepInPlace: Bool = true
     let ignoreContentTouches: Bool = true
     let blurBackground: Bool = true
-    let actionsHorizontalAlignment: ContextActionsHorizontalAlignment = .center
+    let centerActionsHorizontally: Bool = true
     
     private let controller: ViewController
     private let sourceNode: ContextExtractedContentContainingNode

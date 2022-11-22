@@ -103,8 +103,4 @@ open class GalleryItemNode: ASDisplayNode {
     open func contentSize() -> CGSize? {
         return nil
     }
-    
-    open var keyShortcuts: [KeyShortcut] {
-        return []
-    }
 }

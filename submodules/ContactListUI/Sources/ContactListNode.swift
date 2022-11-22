@@ -99,11 +99,11 @@ private final class ContactListNodeInteraction {
     fileprivate let authorize: () -> Void
     fileprivate let suppressWarning: () -> Void
     fileprivate let openPeer: (ContactListPeer, ContactListAction) -> Void
-    fileprivate let contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?
+    fileprivate let contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?) -> Void)?
     
     let itemHighlighting = ContactItemHighlighting()
     
-    init(activateSearch: @escaping () -> Void, authorize: @escaping () -> Void, suppressWarning: @escaping () -> Void, openPeer: @escaping (ContactListPeer, ContactListAction) -> Void, contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?) {
+    init(activateSearch: @escaping () -> Void, authorize: @escaping () -> Void, suppressWarning: @escaping () -> Void, openPeer: @escaping (ContactListPeer, ContactListAction) -> Void, contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?) -> Void)?) {
         self.activateSearch = activateSearch
         self.authorize = authorize
         self.suppressWarning = suppressWarning
@@ -211,17 +211,15 @@ private enum ContactListNodeEntry: Comparable, Identifiable {
                 if isSearch {
                     status = .none
                 }
-                var itemContextAction: ((ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?
+                var itemContextAction: ((ASDisplayNode, ContextGesture?) -> Void)?
                 if isContextActionEnabled, let contextAction = interaction.contextAction {
-                    itemContextAction = { node, gesture, location in
+                    itemContextAction = { node, gesture in
                         switch itemPeer {
                         case let .peer(peer, _):
                             if let peer = peer {
-                                contextAction(peer, node, gesture, location)
+                                contextAction(peer, node, gesture)
                             }
                         case .deviceContact:
-                            break
-                        case .thread:
                             break
                         }
                     }
@@ -868,7 +866,7 @@ public final class ContactListNode: ASDisplayNode {
     public var openPeer: ((ContactListPeer, ContactListAction) -> Void)?
     public var openPrivacyPolicy: (() -> Void)?
     public var suppressPermissionWarning: (() -> Void)?
-    private let contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?
+    private let contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?) -> Void)?
     
     private let previousEntries = Atomic<[ContactListNodeEntry]?>(value: nil)
     private let disposable = MetaDisposable()
@@ -882,7 +880,7 @@ public final class ContactListNode: ASDisplayNode {
     
     public var multipleSelection = false
     
-    public init(context: AccountContext, updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)? = nil, presentation: Signal<ContactListPresentation, NoError>, filters: [ContactListFilter] = [.excludeSelf], selectionState: ContactListNodeGroupSelectionState? = nil, displayPermissionPlaceholder: Bool = true, displaySortOptions: Bool = false, displayCallIcons: Bool = false, contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?, CGPoint?) -> Void)? = nil, isSearch: Bool = false, multipleSelection: Bool = false) {
+    public init(context: AccountContext, updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)? = nil, presentation: Signal<ContactListPresentation, NoError>, filters: [ContactListFilter] = [.excludeSelf], selectionState: ContactListNodeGroupSelectionState? = nil, displayPermissionPlaceholder: Bool = true, displaySortOptions: Bool = false, displayCallIcons: Bool = false, contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?) -> Void)? = nil, isSearch: Bool = false, multipleSelection: Bool = false) {
         self.context = context
         self.filters = filters
         self.displayPermissionPlaceholder = displayPermissionPlaceholder
@@ -1267,7 +1265,7 @@ public final class ContactListNode: ASDisplayNode {
                         return context.engine.data.get(EngineDataMap(
                             view.entries.compactMap { entry -> EnginePeer.Id? in
                                 switch entry {
-                                case let .MessageEntry(_, _, _, _, _, renderedPeer, _, _, _, _, _):
+                                case let .MessageEntry(_, _, _, _, _, renderedPeer, _, _, _, _):
                                     if let peer = renderedPeer.peer {
                                         if let channel = peer as? TelegramChannel, case .group = channel.info {
                                             return peer.id
@@ -1283,7 +1281,7 @@ public final class ContactListNode: ASDisplayNode {
                             var peers: [(EnginePeer, Int32)] = []
                             for entry in view.entries {
                                 switch entry {
-                                case let .MessageEntry(_, _, _, _, _, renderedPeer, _, _, _, _, _):
+                                case let .MessageEntry(_, _, _, _, _, renderedPeer, _, _, _, _):
                                     if let peer = renderedPeer.peer {
                                         if peer is TelegramGroup {
                                             peers.append((EnginePeer(peer), 0))

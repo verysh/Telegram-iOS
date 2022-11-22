@@ -84,7 +84,7 @@ private func peerButtons(_ peer: Peer, interfaceState: ChatPresentationInterface
         buttons.append(.info)
         return buttons
     } else if let channel = peer as? TelegramChannel {
-        if channel.flags.contains(.isCreator) || channel.addressName == nil {
+        if channel.flags.contains(.isCreator) || channel.username == nil {
             return [.search, muteAction, infoButton]
         } else {
             return [.search, .report, muteAction, infoButton]

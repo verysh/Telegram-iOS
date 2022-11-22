@@ -15,12 +15,12 @@ import WallpaperBackgroundNode
 
 func canViewMessageReactionList(message: Message) -> Bool {
     var found = false
-    var canViewList = false
     for attribute in message.attributes {
         if let attribute = attribute as? ReactionsMessageAttribute {
-            canViewList = attribute.canViewList
+            if !attribute.canViewList {
+                return false
+            }
             found = true
-            break
         }
     }
     
@@ -33,11 +33,9 @@ func canViewMessageReactionList(message: Message) -> Bool {
             if case .broadcast = channel.info {
                 return false
             } else {
-                return canViewList
+                return true
             }
         } else if let _ = peer as? TelegramGroup {
-            return canViewList
-        } else if let _ = peer as? TelegramUser {
             return true
         } else {
             return false
@@ -62,10 +60,10 @@ final class MessageReactionButtonsNode: ASDisplayNode {
     private var bubbleBackgroundNode: WallpaperBubbleBackgroundNode?
     private let container: ReactionButtonsAsyncLayoutContainer
     private var backgroundMaskView: UIView?
-    private var backgroundMaskButtons: [MessageReaction.Reaction: UIView] = [:]
+    private var backgroundMaskButtons: [String: UIView] = [:]
     
-    var reactionSelected: ((MessageReaction.Reaction) -> Void)?
-    var openReactionPreview: ((ContextGesture?, ContextExtractedContentContainingView, MessageReaction.Reaction) -> Void)?
+    var reactionSelected: ((String) -> Void)?
+    var openReactionPreview: ((ContextGesture?, ContextExtractedContentContainingView, String) -> Void)?
     
     override init() {
         self.container = ReactionButtonsAsyncLayoutContainer()
@@ -86,7 +84,6 @@ final class MessageReactionButtonsNode: ASDisplayNode {
         presentationContext: ChatPresentationContext,
         availableReactions: AvailableReactions?,
         reactions: ReactionsMessageAttribute,
-        accountPeer: EnginePeer?,
         message: Message,
         alignment: DisplayAlignment,
         constrainedWidth: CGFloat,
@@ -103,9 +100,7 @@ final class MessageReactionButtonsNode: ASDisplayNode {
                 deselectedForeground: themeColors.reactionInactiveForeground.argb,
                 selectedForeground: themeColors.reactionActiveForeground.argb,
                 extractedBackground: presentationData.theme.theme.contextMenu.backgroundColor.argb,
-                extractedForeground:  presentationData.theme.theme.contextMenu.primaryColor.argb,
-                deselectedMediaPlaceholder: themeColors.reactionInactiveMediaPlaceholder.argb,
-                selectedMediaPlaceholder: themeColors.reactionActiveMediaPlaceholder.argb
+                extractedForeground:  presentationData.theme.theme.contextMenu.primaryColor.argb
             )
         case .outgoing:
             themeColors = bubbleColorComponents(theme: presentationData.theme.theme, incoming: false, wallpaper: !presentationData.theme.wallpaper.isEmpty)
@@ -115,9 +110,7 @@ final class MessageReactionButtonsNode: ASDisplayNode {
                 deselectedForeground: themeColors.reactionInactiveForeground.argb,
                 selectedForeground: themeColors.reactionActiveForeground.argb,
                 extractedBackground: presentationData.theme.theme.contextMenu.backgroundColor.argb,
-                extractedForeground:  presentationData.theme.theme.contextMenu.primaryColor.argb,
-                deselectedMediaPlaceholder: themeColors.reactionInactiveMediaPlaceholder.argb,
-                selectedMediaPlaceholder: themeColors.reactionActiveMediaPlaceholder.argb
+                extractedForeground:  presentationData.theme.theme.contextMenu.primaryColor.argb
             )
         case .freeform:
             if presentationData.theme.wallpaper.isEmpty {
@@ -132,9 +125,7 @@ final class MessageReactionButtonsNode: ASDisplayNode {
                 deselectedForeground: themeColors.reactionInactiveForeground.argb,
                 selectedForeground: themeColors.reactionActiveForeground.argb,
                 extractedBackground: presentationData.theme.theme.contextMenu.backgroundColor.argb,
-                extractedForeground:  presentationData.theme.theme.contextMenu.primaryColor.argb,
-                deselectedMediaPlaceholder: themeColors.reactionInactiveMediaPlaceholder.argb,
-                selectedMediaPlaceholder: themeColors.reactionActiveMediaPlaceholder.argb
+                extractedForeground:  presentationData.theme.theme.contextMenu.primaryColor.argb
             )
         }
         
@@ -153,59 +144,43 @@ final class MessageReactionButtonsNode: ASDisplayNode {
             },
             reactions: reactions.reactions.map { reaction in
                 var centerAnimation: TelegramMediaFile?
-                var animationFileId: Int64?
+                var legacyIcon: TelegramMediaFile?
                 
-                switch reaction.value {
-                case .builtin:
-                    if let availableReactions = availableReactions {
-                        for availableReaction in availableReactions.reactions {
-                            if availableReaction.value == reaction.value {
-                                centerAnimation = availableReaction.centerAnimation
-                                break
-                            }
+                if let availableReactions = availableReactions {
+                    for availableReaction in availableReactions.reactions {
+                        if availableReaction.value == reaction.value {
+                            centerAnimation = availableReaction.centerAnimation
+                            legacyIcon = availableReaction.staticIcon
+                            break
                         }
                     }
-                case let .custom(fileId):
-                    animationFileId = fileId
                 }
                 
                 var peers: [EnginePeer] = []
-                
-                if message.id.peerId.namespace == Namespaces.Peer.CloudUser {
-                    if reaction.isSelected, let accountPeer = accountPeer {
-                        peers.append(accountPeer)
-                    }
-                    if !reaction.isSelected || reaction.count >= 2 {
-                        if let peer = message.peers[message.id.peerId] {
-                            peers.append(EnginePeer(peer))
-                        }
-                    }
+                if let channel = message.peers[message.id.peerId] as? TelegramChannel, case .broadcast = channel.info {
                 } else {
-                    if let channel = message.peers[message.id.peerId] as? TelegramChannel, case .broadcast = channel.info {
-                    } else {
-                        for recentPeer in reactions.recentPeers {
-                            if recentPeer.value == reaction.value {
-                                if let peer = message.peers[recentPeer.peerId] {
-                                    peers.append(EnginePeer(peer))
-                                }
+                    for recentPeer in reactions.recentPeers {
+                        if recentPeer.value == reaction.value {
+                            if let peer = message.peers[recentPeer.peerId] {
+                                peers.append(EnginePeer(peer))
                             }
                         }
                     }
-                    
-                    if peers.count != Int(reaction.count) || totalReactionCount != reactions.recentPeers.count {
-                        peers.removeAll()
-                    }
+                }
+                
+                if peers.count != Int(reaction.count) || totalReactionCount != reactions.recentPeers.count {
+                    peers.removeAll()
                 }
                 
                 return ReactionButtonsAsyncLayoutContainer.Reaction(
                     reaction: ReactionButtonComponent.Reaction(
                         value: reaction.value,
                         centerAnimation: centerAnimation,
-                        animationFileId: animationFileId
+                        legacyIcon: legacyIcon
                     ),
                     count: Int(reaction.count),
                     peers: peers,
-                    chosenOrder: reaction.chosenOrder
+                    isSelected: reaction.isSelected
                 )
             },
             colors: reactionColors,
@@ -291,15 +266,9 @@ final class MessageReactionButtonsNode: ASDisplayNode {
                     reactionButtonPosition = CGPoint(x: size.width + 1.0, y: topInset)
                 }
                 
-                let reactionButtons = reactionButtonsResult.apply(
-                    animation,
-                    ReactionButtonsAsyncLayoutContainer.Arguments(
-                        animationCache: presentationContext.animationCache,
-                        animationRenderer: presentationContext.animationRenderer
-                    )
-                )
+                let reactionButtons = reactionButtonsResult.apply(animation)
                 
-                var validIds = Set<MessageReaction.Reaction>()
+                var validIds = Set<String>()
                 for item in reactionButtons.items {
                     validIds.insert(item.value)
                     
@@ -383,7 +352,7 @@ final class MessageReactionButtonsNode: ASDisplayNode {
                     }
                 }
                 
-                var removeMaskIds: [MessageReaction.Reaction] = []
+                var removeMaskIds: [String] = []
                 for (id, view) in strongSelf.backgroundMaskButtons {
                     if !validIds.contains(id) {
                         removeMaskIds.append(id)
@@ -446,7 +415,7 @@ final class MessageReactionButtonsNode: ASDisplayNode {
         }
     }
     
-    func reactionTargetView(value: MessageReaction.Reaction) -> UIView? {
+    func reactionTargetView(value: String) -> UIView? {
         for (key, button) in self.container.buttons {
             if key == value {
                 return button.view.iconView
@@ -511,10 +480,10 @@ final class ChatMessageReactionsFooterContentNode: ChatMessageBubbleContentNode 
         fatalError("init(coder:) has not been implemented")
     }
     
-    override func asyncLayoutContent() -> (_ item: ChatMessageBubbleContentItem, _ layoutConstants: ChatMessageItemLayoutConstants, _ preparePosition: ChatMessageBubblePreparePosition, _ messageSelection: Bool?, _ constrainedSize: CGSize, _ avatarInset: CGFloat) -> (ChatMessageBubbleContentProperties, CGSize?, CGFloat, (CGSize, ChatMessageBubbleContentPosition) -> (CGFloat, (CGFloat) -> (CGSize, (ListViewItemUpdateAnimation, Bool, ListViewItemApply?) -> Void))) {
+    override func asyncLayoutContent() -> (_ item: ChatMessageBubbleContentItem, _ layoutConstants: ChatMessageItemLayoutConstants, _ preparePosition: ChatMessageBubblePreparePosition, _ messageSelection: Bool?, _ constrainedSize: CGSize) -> (ChatMessageBubbleContentProperties, CGSize?, CGFloat, (CGSize, ChatMessageBubbleContentPosition) -> (CGFloat, (CGFloat) -> (CGSize, (ListViewItemUpdateAnimation, Bool, ListViewItemApply?) -> Void))) {
         let buttonsNode = self.buttonsNode
         
-        return { item, layoutConstants, preparePosition, _, constrainedSize, _ in
+        return { item, layoutConstants, preparePosition, _, constrainedSize in
             let contentProperties = ChatMessageBubbleContentProperties(hidesSimpleAuthorHeader: false, headerSpacing: 0.0, hidesBackground: .never, forceFullCorners: false, forceAlignment: .none)
             
             //let displaySeparator: Bool
@@ -533,7 +502,7 @@ final class ChatMessageReactionsFooterContentNode: ChatMessageBubbleContentNode 
                     context: item.context,
                     presentationData: item.presentationData,
                     presentationContext: item.controllerInteraction.presentationContext,
-                    availableReactions: item.associatedData.availableReactions, reactions: reactionsAttribute, accountPeer: item.associatedData.accountPeer, message: item.message, alignment: .left, constrainedWidth: constrainedSize.width - layoutConstants.text.bubbleInsets.left - layoutConstants.text.bubbleInsets.right, type: item.message.effectivelyIncoming(item.context.account.peerId) ? .incoming : .outgoing)
+                    availableReactions: item.associatedData.availableReactions, reactions: reactionsAttribute, message: item.message, alignment: .left, constrainedWidth: constrainedSize.width - layoutConstants.text.bubbleInsets.left - layoutConstants.text.bubbleInsets.right, type: item.message.effectivelyIncoming(item.context.account.peerId) ? .incoming : .outgoing)
                      
                 return (layoutConstants.text.bubbleInsets.left + layoutConstants.text.bubbleInsets.right + buttonsUpdate.proposedWidth, { boundingWidth in
                     var boundingSize = CGSize()
@@ -600,7 +569,7 @@ final class ChatMessageReactionsFooterContentNode: ChatMessageBubbleContentNode 
         return nil
     }
     
-    override func reactionTargetView(value: MessageReaction.Reaction) -> UIView? {
+    override func reactionTargetView(value: String) -> UIView? {
         return self.buttonsNode.reactionTargetView(value: value)
     }
 }
@@ -613,7 +582,6 @@ final class ChatMessageReactionButtonsNode: ASDisplayNode {
         let availableReactions: AvailableReactions?
         let reactions: ReactionsMessageAttribute
         let message: Message
-        let accountPeer: EnginePeer?
         let isIncoming: Bool
         let constrainedWidth: CGFloat
         
@@ -624,7 +592,6 @@ final class ChatMessageReactionButtonsNode: ASDisplayNode {
             availableReactions: AvailableReactions?,
             reactions: ReactionsMessageAttribute,
             message: Message,
-            accountPeer: EnginePeer?,
             isIncoming: Bool,
             constrainedWidth: CGFloat
         ) {
@@ -634,7 +601,6 @@ final class ChatMessageReactionButtonsNode: ASDisplayNode {
             self.availableReactions = availableReactions
             self.reactions = reactions
             self.message = message
-            self.accountPeer = accountPeer
             self.isIncoming = isIncoming
             self.constrainedWidth = constrainedWidth
         }
@@ -642,8 +608,8 @@ final class ChatMessageReactionButtonsNode: ASDisplayNode {
     
     private let buttonsNode: MessageReactionButtonsNode
     
-    var reactionSelected: ((MessageReaction.Reaction) -> Void)?
-    var openReactionPreview: ((ContextGesture?, ContextExtractedContentContainingView, MessageReaction.Reaction) -> Void)?
+    var reactionSelected: ((String) -> Void)?
+    var openReactionPreview: ((ContextGesture?, ContextExtractedContentContainingView, String) -> Void)?
     
     override init() {
         self.buttonsNode = MessageReactionButtonsNode()
@@ -671,7 +637,6 @@ final class ChatMessageReactionButtonsNode: ASDisplayNode {
                 presentationContext: arguments.presentationContext,
                 availableReactions: arguments.availableReactions,
                 reactions: arguments.reactions,
-                accountPeer: arguments.accountPeer,
                 message: arguments.message,
                 alignment: arguments.isIncoming ? .left : .right,
                 constrainedWidth: arguments.constrainedWidth,
@@ -704,7 +669,7 @@ final class ChatMessageReactionButtonsNode: ASDisplayNode {
         animation.animator.updateFrame(layer: self.buttonsNode.layer, frame: self.buttonsNode.layer.frame.offsetBy(dx: 0.0, dy: -self.buttonsNode.layer.bounds.height / 2.0), completion: nil)
     }
     
-    func reactionTargetView(value: MessageReaction.Reaction) -> UIView? {
+    func reactionTargetView(value: String) -> UIView? {
         return self.buttonsNode.reactionTargetView(value: value)
     }
     

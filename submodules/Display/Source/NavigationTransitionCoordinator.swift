@@ -37,7 +37,6 @@ final class NavigationTransitionCoordinator {
     private let container: NavigationContainer
     private let transition: NavigationTransition
     let isInteractive: Bool
-    let isFlat: Bool
     let topNode: ASDisplayNode
     let bottomNode: ASDisplayNode
     private let topNavigationBar: NavigationBar?
@@ -52,10 +51,9 @@ final class NavigationTransitionCoordinator {
     private var currentCompletion: (() -> Void)?
     private var didUpdateProgress: ((CGFloat, ContainedViewLayoutTransition, CGRect, CGRect) -> Void)?
     
-    init(transition: NavigationTransition, isInteractive: Bool, isFlat: Bool, container: NavigationContainer, topNode: ASDisplayNode, topNavigationBar: NavigationBar?, bottomNode: ASDisplayNode, bottomNavigationBar: NavigationBar?, didUpdateProgress: ((CGFloat, ContainedViewLayoutTransition, CGRect, CGRect) -> Void)? = nil) {
+    init(transition: NavigationTransition, isInteractive: Bool, container: NavigationContainer, topNode: ASDisplayNode, topNavigationBar: NavigationBar?, bottomNode: ASDisplayNode, bottomNavigationBar: NavigationBar?, didUpdateProgress: ((CGFloat, ContainedViewLayoutTransition, CGRect, CGRect) -> Void)? = nil) {
         self.transition = transition
         self.isInteractive = isInteractive
-        self.isFlat = isFlat
         self.container = container
         self.didUpdateProgress = didUpdateProgress
         self.topNode = topNode
@@ -100,10 +98,8 @@ final class NavigationTransitionCoordinator {
             self.container.insertSubnode(bottomNode, belowSubnode: topNode)
         }
         
-        if !self.isFlat {
-            self.container.insertSubnode(self.dimNode, belowSubnode: topNode)
-            self.container.insertSubnode(self.shadowNode, belowSubnode: self.dimNode)
-        }
+        self.container.insertSubnode(self.dimNode, belowSubnode: topNode)
+        self.container.insertSubnode(self.shadowNode, belowSubnode: self.dimNode)
         if let customTransitionNode = self.customTransitionNode {
             self.container.addSubnode(customTransitionNode)
         }
@@ -139,7 +135,7 @@ final class NavigationTransitionCoordinator {
         let containerSize = self.container.bounds.size
         
         let topFrame = CGRect(origin: CGPoint(x: floorToScreenPixels(position * containerSize.width), y: 0.0), size: containerSize)
-        let bottomFrame = CGRect(origin: CGPoint(x: self.isFlat ? -floorToScreenPixels((1.0 - position) * containerSize.width) : ((position - 1.0) * containerSize.width * 0.3), y: 0.0), size: containerSize)
+        let bottomFrame = CGRect(origin: CGPoint(x: ((position - 1.0) * containerSize.width * 0.3), y: 0.0), size: containerSize)
         
         var canInvokeCompletion = false
         var hadEarlyCompletion = false

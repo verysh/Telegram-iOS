@@ -25,8 +25,6 @@ final class AttachmentTextInputActionButtonsNode: ASDisplayNode {
             self.gestureRecognizer?.isEnabled = self.sendButtonLongPressEnabled
         }
     }
-    
-    private var sendButtonPointerInteraction: PointerInteraction?
         
     private var validLayout: CGSize?
     
@@ -41,7 +39,7 @@ final class AttachmentTextInputActionButtonsNode: ASDisplayNode {
         self.backgroundNode = ASDisplayNode()
         self.backgroundNode.backgroundColor = theme.chat.inputPanel.actionControlFillColor
         self.backgroundNode.clipsToBounds = true
-        self.sendButton = HighlightTrackingButtonNode(pointerStyle: nil)
+        self.sendButton = HighlightTrackingButtonNode(pointerStyle: .lift)
                 
         self.textNode = ImmediateTextNode()
         self.textNode.attributedText = NSAttributedString(string: self.strings.MediaPicker_Send, font: Font.semibold(17.0), textColor: theme.chat.inputPanel.actionControlForegroundColor)
@@ -92,8 +90,6 @@ final class AttachmentTextInputActionButtonsNode: ASDisplayNode {
                 strongSelf.sendButtonLongPressed?(strongSelf.sendContainerNode, recognizer)
             }
         }
-        
-        self.sendButtonPointerInteraction = PointerInteraction(view: self.sendButton.view, customInteractionView: self.backgroundNode.view, style: .lift)
     }
     
     func updateTheme(theme: PresentationTheme, wallpaper: TelegramWallpaper) {

@@ -115,12 +115,12 @@ public final class ContextExtractedContentView: UIView {
 }
 
 public final class ContextControllerContentNode: ASDisplayNode {
-    public let sourceView: UIView
+    public let sourceNode: ASDisplayNode
     public let controller: ViewController
     private let tapped: () -> Void
     
-    public init(sourceView: UIView, controller: ViewController, tapped: @escaping () -> Void) {
-        self.sourceView = sourceView
+    public init(sourceNode: ASDisplayNode, controller: ViewController, tapped: @escaping () -> Void) {
+        self.sourceNode = sourceNode
         self.controller = controller
         self.tapped = tapped
         

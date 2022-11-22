@@ -13,8 +13,6 @@ import UniversalMediaPlayer
 import GalleryUI
 import HierarchyTrackingLayer
 import AccountContext
-import ComponentFlow
-import EmojiStatusComponent
 
 private let normalFont = avatarPlaceholderFont(size: 16.0)
 private let smallFont = avatarPlaceholderFont(size: 12.0)
@@ -27,8 +25,6 @@ final class ChatAvatarNavigationNode: ASDisplayNode {
     private let containerNode: ContextControllerSourceNode
     let avatarNode: AvatarNode
     private var videoNode: UniversalVideoNode?
-    
-    private let statusView: ComponentView<Empty>
     
     private var videoContent: NativeVideoContent?
     private let playbackStartDisposable = MetaDisposable()
@@ -47,7 +43,7 @@ final class ChatAvatarNavigationNode: ASDisplayNode {
     }
     
     var contextAction: ((ASDisplayNode, ContextGesture?) -> Void)?
-    var contextActionIsEnabled: Bool = false {
+    var contextActionIsEnabled: Bool = true {
         didSet {
             if self.contextActionIsEnabled != oldValue {
                 self.containerNode.isGestureEnabled = self.contextActionIsEnabled
@@ -57,9 +53,7 @@ final class ChatAvatarNavigationNode: ASDisplayNode {
         
     override init() {
         self.containerNode = ContextControllerSourceNode()
-        self.containerNode.isGestureEnabled = false
         self.avatarNode = AvatarNode(font: normalFont)
-        self.statusView = ComponentView()
         
         super.init()
         
@@ -85,31 +79,6 @@ final class ChatAvatarNavigationNode: ASDisplayNode {
     override func didLoad() {
         super.didLoad()
         self.view.isOpaque = false
-    }
-    
-    public func setStatus(context: AccountContext, content: EmojiStatusComponent.Content) {
-        let statusSize = self.statusView.update(
-            transition: .immediate,
-            component: AnyComponent(EmojiStatusComponent(
-                context: context,
-                animationCache: context.animationCache,
-                animationRenderer: context.animationRenderer,
-                content: content,
-                isVisibleForAnimations: true,
-                action: nil
-            )),
-            environment: {},
-            containerSize: CGSize(width: 32.0, height: 32.0)
-        )
-        if let statusComponentView = self.statusView.view {
-            if statusComponentView.superview == nil {
-                self.containerNode.view.addSubview(statusComponentView)
-            }
-            
-            statusComponentView.frame = CGRect(origin: CGPoint(x: floor((self.containerNode.bounds.width - statusSize.width) / 2.0), y: floor((self.containerNode.bounds.height - statusSize.height) / 2.0)), size: statusSize)
-        }
-        
-        self.avatarNode.isHidden = true
     }
     
     public func setPeer(context: AccountContext, theme: PresentationTheme, peer: EnginePeer?, authorOfMessage: MessageReference? = nil, overrideImage: AvatarNodeImageOverride? = nil, emptyColor: UIColor? = nil, clipStyle: AvatarNodeClipStyle = .round, synchronousLoad: Bool = false, displayDimensions: CGSize = CGSize(width: 60.0, height: 60.0), storeUnrounded: Bool = false) {

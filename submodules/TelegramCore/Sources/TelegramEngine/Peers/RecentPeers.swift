@@ -66,11 +66,13 @@ func _internal_managedUpdatedRecentPeers(accountPeerId: PeerId, postbox: Postbox
             switch result {
                 case let .topPeers(_, _, users):
                     var peers: [Peer] = []
-                    var peerPresences: [PeerId: Api.User] = [:]
+                    var peerPresences: [PeerId: PeerPresence] = [:]
                     for user in users {
                         let telegramUser = TelegramUser(user: user)
                         peers.append(telegramUser)
-                        peerPresences[telegramUser.id] = user
+                        if let presence = TelegramUserPresence(apiUser: user) {
+                            peerPresences[telegramUser.id] = presence
+                        }
                     }
                     updatePeers(transaction: transaction, peers: peers, update: { return $1 })
                     
@@ -156,17 +158,19 @@ func _internal_updateRecentPeersEnabled(postbox: Postbox, network: Network, enab
 func _internal_managedRecentlyUsedInlineBots(postbox: Postbox, network: Network, accountPeerId: PeerId) -> Signal<Void, NoError> {
     let remotePeers = network.request(Api.functions.contacts.getTopPeers(flags: 1 << 2, offset: 0, limit: 16, hash: 0))
         |> retryRequest
-        |> map { result -> ([Peer], [PeerId: Api.User], [(PeerId, Double)])? in
+        |> map { result -> ([Peer], [PeerId: PeerPresence], [(PeerId, Double)])? in
             switch result {
                 case .topPeersDisabled:
                     break
                 case let .topPeers(categories, _, users):
                     var peers: [Peer] = []
-                    var peerPresences: [PeerId: Api.User] = [:]
+                    var peerPresences: [PeerId: PeerPresence] = [:]
                     for user in users {
                         let telegramUser = TelegramUser(user: user)
                         peers.append(telegramUser)
-                        peerPresences[telegramUser.id] = user
+                        if let presence = TelegramUserPresence(apiUser: user) {
+                            peerPresences[telegramUser.id] = presence
+                        }
                     }
                     var peersWithRating: [(PeerId, Double)] = []
                     for category in categories {

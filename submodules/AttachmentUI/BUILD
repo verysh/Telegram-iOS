@@ -34,7 +34,6 @@ swift_library(
         "//submodules/SemanticStatusNode:SemanticStatusNode",
         "//submodules/MoreButtonNode:MoreButtonNode",
         "//submodules/Components/AnimatedStickerComponent:AnimatedStickerComponent",
-        "//submodules/Components/MultilineTextComponent:MultilineTextComponent",
     ],
     visibility = [
         "//visibility:public",

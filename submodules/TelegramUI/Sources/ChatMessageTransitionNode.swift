@@ -10,14 +10,6 @@ import Postbox
 import TelegramCore
 import ReactionSelectionNode
 
-private func convertAnimatingSourceRect(_ rect: CGRect, fromView: UIView, toView: UIView?) -> CGRect {
-    if let presentationLayer = fromView.layer.presentation() {
-        return presentationLayer.convert(rect, to: toView?.layer)
-    } else {
-        return fromView.layer.convert(rect, to: toView?.layer)
-    }
-}
-
 private final class OverlayTransitionContainerNode: ViewControllerTracingNode {
     override init() {
         super.init()
@@ -119,50 +111,16 @@ public final class ChatMessageTransitionNode: ASDisplayNode {
     }
 
     final class Sticker {
-        let imageNode: TransformImageNode?
+        let imageNode: TransformImageNode
         let animationNode: AnimatedStickerNode?
         let placeholderNode: ASDisplayNode?
-        let imageLayer: CALayer?
         let relativeSourceRect: CGRect
-        
-        var sourceFrame: CGRect {
-            if let imageNode = self.imageNode {
-                return imageNode.frame
-            } else if let imageLayer = self.imageLayer {
-                return imageLayer.bounds
-            } else {
-                return CGRect(origin: CGPoint(), size: relativeSourceRect.size)
-            }
-        }
-        
-        var sourceLayer: CALayer? {
-            if let imageNode = self.imageNode {
-                return imageNode.layer
-            } else if let imageLayer = self.imageLayer {
-                return imageLayer
-            } else {
-                return nil
-            }
-        }
 
-        init(imageNode: TransformImageNode?, animationNode: AnimatedStickerNode?, placeholderNode: ASDisplayNode?, imageLayer: CALayer?, relativeSourceRect: CGRect) {
+        init(imageNode: TransformImageNode, animationNode: AnimatedStickerNode?, placeholderNode: ASDisplayNode?, relativeSourceRect: CGRect) {
             self.imageNode = imageNode
             self.animationNode = animationNode
             self.placeholderNode = placeholderNode
-            self.imageLayer = imageLayer
             self.relativeSourceRect = relativeSourceRect
-        }
-        
-        func snapshotContentTree() -> UIView? {
-            if let animationNode = self.animationNode {
-                return animationNode.view.snapshotContentTree()
-            } else if let imageNode = self.imageNode {
-                return imageNode.view.snapshotContentTree()
-            } else if let sourceLayer = self.imageLayer {
-                return sourceLayer.snapshotContentTreeAsView()
-            } else {
-                return nil
-            }
         }
     }
 
@@ -184,7 +142,6 @@ public final class ChatMessageTransitionNode: ASDisplayNode {
         enum StickerInput {
             case inputPanel(itemNode: ChatMediaInputStickerGridItemNode)
             case mediaPanel(itemNode: HorizontalStickerGridItemNode)
-            case universal(sourceContainerView: UIView, sourceRect: CGRect, sourceLayer: CALayer)
             case inputPanelSearch(itemNode: StickerPaneSearchStickerItemNode)
             case emptyPanel(itemNode: ChatEmptyNodeStickerContentNode)
         }
@@ -431,19 +388,16 @@ public final class ChatMessageTransitionNode: ASDisplayNode {
                 let sourceAbsoluteRect: CGRect
                 switch stickerMediaInput {
                 case let .inputPanel(sourceItemNode):
-                    stickerSource = Sticker(imageNode: sourceItemNode.imageNode, animationNode: sourceItemNode.animationNode, placeholderNode: sourceItemNode.placeholderNode, imageLayer: nil, relativeSourceRect: sourceItemNode.imageNode.frame)
-                    sourceAbsoluteRect = sourceItemNode.view.convert(sourceItemNode.imageNode.frame, to: self.view)
+                    stickerSource = Sticker(imageNode: sourceItemNode.imageNode, animationNode: sourceItemNode.animationNode, placeholderNode: sourceItemNode.placeholderNode, relativeSourceRect: sourceItemNode.imageNode.frame)
+                    sourceAbsoluteRect = sourceItemNode.view.convert(stickerSource.imageNode.frame, to: self.view)
                 case let .mediaPanel(sourceItemNode):
-                    stickerSource = Sticker(imageNode: sourceItemNode.imageNode, animationNode: sourceItemNode.animationNode, placeholderNode: sourceItemNode.placeholderNode, imageLayer: nil, relativeSourceRect: sourceItemNode.imageNode.frame)
-                    sourceAbsoluteRect = sourceItemNode.view.convert(sourceItemNode.imageNode.frame, to: self.view)
-                case let .universal(sourceContainerView, sourceRect, sourceLayer):
-                    stickerSource = Sticker(imageNode: nil, animationNode: nil, placeholderNode: nil, imageLayer: sourceLayer, relativeSourceRect: sourceLayer.frame)
-                    sourceAbsoluteRect = convertAnimatingSourceRect(sourceRect, fromView: sourceContainerView, toView: self.view)
+                    stickerSource = Sticker(imageNode: sourceItemNode.imageNode, animationNode: sourceItemNode.animationNode, placeholderNode: sourceItemNode.placeholderNode, relativeSourceRect: sourceItemNode.imageNode.frame)
+                    sourceAbsoluteRect = sourceItemNode.view.convert(stickerSource.imageNode.frame, to: self.view)
                 case let .inputPanelSearch(sourceItemNode):
-                    stickerSource = Sticker(imageNode: sourceItemNode.imageNode, animationNode: sourceItemNode.animationNode, placeholderNode: nil, imageLayer: nil, relativeSourceRect: sourceItemNode.imageNode.frame)
-                    sourceAbsoluteRect = sourceItemNode.view.convert(sourceItemNode.imageNode.frame, to: self.view)
+                    stickerSource = Sticker(imageNode: sourceItemNode.imageNode, animationNode: sourceItemNode.animationNode, placeholderNode: nil, relativeSourceRect: sourceItemNode.imageNode.frame)
+                    sourceAbsoluteRect = sourceItemNode.view.convert(stickerSource.imageNode.frame, to: self.view)
                 case let .emptyPanel(sourceItemNode):
-                    stickerSource = Sticker(imageNode: sourceItemNode.stickerNode.imageNode, animationNode: sourceItemNode.stickerNode.animationNode, placeholderNode: nil, imageLayer: nil, relativeSourceRect: sourceItemNode.stickerNode.imageNode.frame)
+                    stickerSource = Sticker(imageNode: sourceItemNode.stickerNode.imageNode, animationNode: sourceItemNode.stickerNode.animationNode, placeholderNode: nil, relativeSourceRect: sourceItemNode.stickerNode.imageNode.frame)
                     sourceAbsoluteRect = sourceItemNode.stickerNode.view.convert(sourceItemNode.stickerNode.imageNode.frame, to: self.view)
                 }
 
@@ -488,7 +442,7 @@ public final class ChatMessageTransitionNode: ASDisplayNode {
                 self.containerNode.layer.animatePosition(from: CGPoint(x: sourceAbsoluteRect.midX - targetAbsoluteRect.midX, y: 0.0), to: CGPoint(), duration: horizontalDuration, delay: delay, mediaTimingFunction: ChatMessageTransitionNode.horizontalAnimationCurve.mediaTimingFunction, additive: true)
 
                 switch stickerMediaInput {
-                case .inputPanel, .universal:
+                case .inputPanel:
                     break
                 case let .mediaPanel(sourceItemNode):
                     sourceItemNode.isHidden = true

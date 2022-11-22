@@ -145,27 +145,27 @@ public enum EnginePeer: Equatable {
     }
 
     public enum IndexName: Equatable {
-        case title(title: String, addressNames: [String])
-        case personName(first: String, last: String, addressNames: [String], phoneNumber: String?)
+        case title(title: String, addressName: String?)
+        case personName(first: String, last: String, addressName: String?, phoneNumber: String?)
 
         public var isEmpty: Bool {
             switch self {
-            case let .title(title, addressNames):
+            case let .title(title, addressName):
                 if !title.isEmpty {
                     return false
                 }
-                if !addressNames.isEmpty {
+                if let addressName = addressName, !addressName.isEmpty {
                     return false
                 }
                 return true
-            case let .personName(first, last, addressNames, phoneNumber):
+            case let .personName(first, last, addressName, phoneNumber):
                 if !first.isEmpty {
                     return false
                 }
                 if !last.isEmpty {
                     return false
                 }
-                if !addressNames.isEmpty {
+                if let addressName = addressName, !addressName.isEmpty {
                     return false
                 }
                 if let phoneNumber = phoneNumber, !phoneNumber.isEmpty {
@@ -396,19 +396,19 @@ public extension EnginePeer.Presence {
 public extension EnginePeer.IndexName {
     init(_ indexName: PeerIndexNameRepresentation) {
         switch indexName {
-        case let .title(title, addressNames):
-            self = .title(title: title, addressNames: addressNames)
-        case let .personName(first, last, addressNames, phoneNumber):
-            self = .personName(first: first, last: last, addressNames: addressNames, phoneNumber: phoneNumber)
+        case let .title(title, addressName):
+            self = .title(title: title, addressName: addressName)
+        case let .personName(first, last, addressName, phoneNumber):
+            self = .personName(first: first, last: last, addressName: addressName, phoneNumber: phoneNumber)
         }
     }
 
     func _asIndexName() -> PeerIndexNameRepresentation {
         switch self {
-        case let .title(title, addressNames):
-            return .title(title: title, addressNames: addressNames)
-        case let .personName(first, last, addressNames, phoneNumber):
-            return .personName(first: first, last: last, addressNames: addressNames, phoneNumber: phoneNumber)
+        case let .title(title, addressName):
+            return .title(title: title, addressName: addressName)
+        case let .personName(first, last, addressName, phoneNumber):
+            return .personName(first: first, last: last, addressName: addressName, phoneNumber: phoneNumber)
         }
     }
 
@@ -531,18 +531,15 @@ public extension EnginePeer {
 public final class EngineRenderedPeer: Equatable {
     public let peerId: EnginePeer.Id
     public let peers: [EnginePeer.Id: EnginePeer]
-    public let associatedMedia: [EngineMedia.Id: Media]
 
-    public init(peerId: EnginePeer.Id, peers: [EnginePeer.Id: EnginePeer], associatedMedia: [EngineMedia.Id: Media]) {
+    public init(peerId: EnginePeer.Id, peers: [EnginePeer.Id: EnginePeer]) {
         self.peerId = peerId
         self.peers = peers
-        self.associatedMedia = associatedMedia
     }
 
     public init(peer: EnginePeer) {
         self.peerId = peer.id
         self.peers = [peer.id: peer]
-        self.associatedMedia = [:]
     }
 
     public static func ==(lhs: EngineRenderedPeer, rhs: EngineRenderedPeer) -> Bool {
@@ -550,9 +547,6 @@ public final class EngineRenderedPeer: Equatable {
             return false
         }
         if lhs.peers != rhs.peers {
-            return false
-        }
-        if !areMediaDictionariesEqual(lhs.associatedMedia, rhs.associatedMedia) {
             return false
         }
         return true
@@ -581,7 +575,7 @@ public extension EngineRenderedPeer {
         for (id, peer) in renderedPeer.peers {
             mappedPeers[id] = EnginePeer(peer)
         }
-        self.init(peerId: renderedPeer.peerId, peers: mappedPeers, associatedMedia: renderedPeer.associatedMedia)
+        self.init(peerId: renderedPeer.peerId, peers: mappedPeers)
     }
 
     convenience init(message: EngineMessage) {

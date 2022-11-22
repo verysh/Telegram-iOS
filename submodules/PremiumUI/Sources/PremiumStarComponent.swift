@@ -19,7 +19,7 @@ private func rad2deg(_ number: Float) -> Float {
 }
 
 private func generateParticlesTexture() -> UIImage {
-    return UIImage()
+    return UIImage() 
 }
 
 private func generateFlecksTexture() -> UIImage {
@@ -46,18 +46,16 @@ private func generateDiffuseTexture() -> UIImage {
 }
 
 class PremiumStarComponent: Component {
-    let isIntro: Bool
     let isVisible: Bool
     let hasIdleAnimations: Bool
         
-    init(isIntro: Bool, isVisible: Bool, hasIdleAnimations: Bool) {
-        self.isIntro = isIntro
+    init(isVisible: Bool, hasIdleAnimations: Bool) {
         self.isVisible = isVisible
         self.hasIdleAnimations = hasIdleAnimations
     }
     
     static func ==(lhs: PremiumStarComponent, rhs: PremiumStarComponent) -> Bool {
-        return lhs.isIntro == rhs.isIntro && lhs.isVisible == rhs.isVisible && lhs.hasIdleAnimations == rhs.hasIdleAnimations
+        return lhs.isVisible == rhs.isVisible && lhs.hasIdleAnimations == rhs.hasIdleAnimations
     }
     
     final class View: UIView, SCNSceneRendererDelegate, ComponentTaggedView {
@@ -86,17 +84,12 @@ class PremiumStarComponent: Component {
         private var timer: SwiftSignalKit.Timer?
         private var hasIdleAnimations = false
         
-        private let isIntro: Bool
-        
-        init(frame: CGRect, isIntro: Bool) {
-            self.isIntro = isIntro
-            
+        override init(frame: CGRect) {
             self.sceneView = SCNView(frame: CGRect(origin: .zero, size: CGSize(width: 64.0, height: 64.0)))
             self.sceneView.backgroundColor = .clear
             self.sceneView.transform = CGAffineTransform(scaleX: 0.5, y: 0.5)
             self.sceneView.isUserInteractionEnabled = false
             self.sceneView.preferredFramesPerSecond = 60
-            self.sceneView.isJitteringEnabled = true
             
             super.init(frame: frame)
             
@@ -204,13 +197,11 @@ class PremiumStarComponent: Component {
             
             self.previousInteractionTimestamp = CACurrentMediaTime()
             
-            let keys = [
-                "rotate",
-                "tapRotate"
-            ]
-
-            for key in keys {
-                node.removeAnimation(forKey: key)
+            if #available(iOS 11.0, *) {
+                node.removeAnimation(forKey: "rotate", blendOutDuration: 0.1)
+                node.removeAnimation(forKey: "tapRotate", blendOutDuration: 0.1)
+            } else {
+                node.removeAllAnimations()
             }
             
             switch gesture.state {
@@ -346,7 +337,6 @@ class PremiumStarComponent: Component {
         }
         
         private func onReady() {
-            self.setupScaleAnimation()
             self.setupGradientAnimation()
             self.setupShineAnimation()
             
@@ -363,25 +353,6 @@ class PremiumStarComponent: Component {
                 }
             }, queue: Queue.mainQueue())
             self.timer?.start()
-        }
-        
-        private func setupScaleAnimation() {
-            guard let scene = self.sceneView.scene, let node = scene.rootNode.childNode(withName: "star", recursively: false) else {
-                return
-            }
-
-            let fromScale: Float = self.isIntro ? 0.1 : 0.08
-            let toScale: Float = self.isIntro ? 0.115 : 0.092
-            
-            let animation = CABasicAnimation(keyPath: "scale")
-            animation.duration = 2.0
-            animation.fromValue = NSValue(scnVector3: SCNVector3(x: fromScale, y: fromScale, z: fromScale))
-            animation.toValue = NSValue(scnVector3: SCNVector3(x: toScale, y: toScale, z: toScale))
-            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            animation.autoreverses = true
-            animation.repeatCount = .infinity
-
-            node.addAnimation(animation, forKey: "scale")
         }
         
         private func setupGradientAnimation() {
@@ -437,48 +408,23 @@ class PremiumStarComponent: Component {
             self.previousInteractionTimestamp = currentTime
             self.delayTapsTill = currentTime + 0.85
             
-            if explode, let node = scene.rootNode.childNode(withName: "swirl", recursively: false), let particlesLeft = scene.rootNode.childNode(withName: "particles_left", recursively: false), let particlesRight = scene.rootNode.childNode(withName: "particles_right", recursively: false), let particlesBottomLeft = scene.rootNode.childNode(withName: "particles_left_bottom", recursively: false), let particlesBottomRight = scene.rootNode.childNode(withName: "particles_right_bottom", recursively: false) {
-                if let leftParticleSystem = particlesLeft.particleSystems?.first, let rightParticleSystem = particlesRight.particleSystems?.first, let leftBottomParticleSystem = particlesBottomLeft.particleSystems?.first, let rightBottomParticleSystem = particlesBottomRight.particleSystems?.first {
-                    leftParticleSystem.speedFactor = 2.0
-                    leftParticleSystem.particleVelocity = 1.6
-                    leftParticleSystem.birthRate = 60.0
-                    leftParticleSystem.particleLifeSpan = 4.0
-                    
-                    rightParticleSystem.speedFactor = 2.0
-                    rightParticleSystem.particleVelocity = 1.6
-                    rightParticleSystem.birthRate = 60.0
-                    rightParticleSystem.particleLifeSpan = 4.0
-                    
-                    leftBottomParticleSystem.particleVelocity = 1.6
-                    leftBottomParticleSystem.birthRate = 24.0
-                    leftBottomParticleSystem.particleLifeSpan = 7.0
-                    
-                    rightBottomParticleSystem.particleVelocity = 1.6
-                    rightBottomParticleSystem.birthRate = 24.0
-                    rightBottomParticleSystem.particleLifeSpan = 7.0
+            if explode, let node = scene.rootNode.childNode(withName: "swirl", recursively: false), let particles = scene.rootNode.childNode(withName: "particles", recursively: false) {
+                if let particleSystem = particles.particleSystems?.first {
+                    particleSystem.particleColorVariation = SCNVector4(0.15, 0.2, 0.15, 0.3)
+                    particleSystem.speedFactor = 2.0
+                    particleSystem.particleVelocity = 2.2
+                    particleSystem.birthRate = 4.0
+                    particleSystem.particleLifeSpan = 2.0
                     
                     node.physicsField?.isActive = true
                     Queue.mainQueue().after(1.0) {
                         node.physicsField?.isActive = false
+                        particles.particleSystems?.first?.birthRate = 1.2
+                        particleSystem.particleVelocity = 1.0
+                        particleSystem.particleLifeSpan = 4.0
                         
-                        leftParticleSystem.birthRate = 12.0
-                        leftParticleSystem.particleVelocity = 1.2
-                        leftParticleSystem.particleLifeSpan = 3.0
-                        
-                        rightParticleSystem.birthRate = 12.0
-                        rightParticleSystem.particleVelocity = 1.2
-                        rightParticleSystem.particleLifeSpan = 3.0
-                        
-                        leftBottomParticleSystem.particleVelocity = 1.2
-                        leftBottomParticleSystem.birthRate = 7.0
-                        leftBottomParticleSystem.particleLifeSpan = 5.0
-                        
-                        rightBottomParticleSystem.particleVelocity = 1.2
-                        rightBottomParticleSystem.birthRate = 7.0
-                        rightBottomParticleSystem.particleLifeSpan = 5.0
-                        
-                        let leftAnimation = POPBasicAnimation()
-                        leftAnimation.property = (POPAnimatableProperty.property(withName: "speedFactor", initializer: { property in
+                        let animation = POPBasicAnimation()
+                        animation.property = (POPAnimatableProperty.property(withName: "speedFactor", initializer: { property in
                             property?.readBlock = { particleSystem, values in
                                 values?.pointee = (particleSystem as! SCNParticleSystem).speedFactor
                             }
@@ -487,35 +433,16 @@ class PremiumStarComponent: Component {
                             }
                             property?.threshold = 0.01
                         }) as! POPAnimatableProperty)
-                        leftAnimation.fromValue = 1.2 as NSNumber
-                        leftAnimation.toValue = 0.85 as NSNumber
-                        leftAnimation.timingFunction = CAMediaTimingFunction(name: CAMediaTimingFunctionName.linear)
-                        leftAnimation.duration = 0.5
-                        leftParticleSystem.pop_add(leftAnimation, forKey: "speedFactor")
-                        
-                        let rightAnimation = POPBasicAnimation()
-                        rightAnimation.property = (POPAnimatableProperty.property(withName: "speedFactor", initializer: { property in
-                            property?.readBlock = { particleSystem, values in
-                                values?.pointee = (particleSystem as! SCNParticleSystem).speedFactor
-                            }
-                            property?.writeBlock = { particleSystem, values in
-                                (particleSystem as! SCNParticleSystem).speedFactor = values!.pointee
-                            }
-                            property?.threshold = 0.01
-                        }) as! POPAnimatableProperty)
-                        rightAnimation.fromValue = 1.2 as NSNumber
-                        rightAnimation.toValue = 0.85 as NSNumber
-                        rightAnimation.timingFunction = CAMediaTimingFunction(name: CAMediaTimingFunctionName.linear)
-                        rightAnimation.duration = 0.5
-                        rightParticleSystem.pop_add(rightAnimation, forKey: "speedFactor")
+                        animation.fromValue = 2.0 as NSNumber
+                        animation.toValue = 1.0 as NSNumber
+                        animation.timingFunction = CAMediaTimingFunction(name: CAMediaTimingFunctionName.linear)
+                        animation.duration = 0.5
+                        particleSystem.pop_add(animation, forKey: "speedFactor")
                     }
                 }
             }
         
-            var from = node.presentation.eulerAngles
-            if abs(from.y - .pi * 2.0) < 0.001 {
-                from.y = 0.0
-            }
+            let from = node.presentation.eulerAngles
             node.removeAnimation(forKey: "tapRotate")
             
             var toValue: Float = smallAngle ? 0.0 : .pi * 2.0
@@ -540,11 +467,7 @@ class PremiumStarComponent: Component {
             springAnimation.damping = 5.8
             springAnimation.duration = springAnimation.settlingDuration * 0.75
             springAnimation.initialVelocity = velocity.flatMap { abs($0 / CGFloat(distance)) } ?? 1.7
-            springAnimation.completion = { [weak node] finished in
-                if finished {
-                    node?.eulerAngles = SCNVector3(x: 0.0, y: 0.0, z: 0.0)
-                }
-            }
+            
             node.addAnimation(springAnimation, forKey: "rotate")
         }
         
@@ -561,7 +484,7 @@ class PremiumStarComponent: Component {
     }
     
     func makeView() -> View {
-        return View(frame: CGRect(), isIntro: self.isIntro)
+        return View(frame: CGRect())
     }
     
     func update(view: View, availableSize: CGSize, state: EmptyComponentState, environment: Environment<Empty>, transition: Transition) -> CGSize {

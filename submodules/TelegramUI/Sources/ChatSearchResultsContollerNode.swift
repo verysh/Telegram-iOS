@@ -12,8 +12,6 @@ import ChatListUI
 import AccountContext
 import ContextUI
 import ChatListSearchItemHeader
-import AnimationCache
-import MultiAnimationRenderer
 
 private enum ChatListSearchEntryStableId: Hashable {
     case messageId(MessageId)
@@ -82,14 +80,13 @@ private enum ChatListSearchEntry: Comparable, Identifiable {
                 return ChatListItem(
                     presentationData: presentationData,
                     context: context,
-                    chatListLocation: .chatList(groupId: .root),
+                    peerGroupId: .root,
                     filterData: nil,
-                    index: .chatList(EngineChatList.Item.Index.ChatList(pinningIndex: nil, messageIndex: message.index)),
+                    index: EngineChatList.Item.Index(pinningIndex: nil, messageIndex: message.index),
                     content: .peer(
                         messages: [EngineMessage(message)],
                         peer: EngineRenderedPeer(peer),
-                        threadInfo: nil,
-                        combinedReadState: readState.flatMap { EnginePeerReadCounters(state: $0, isMuted: false) },
+                        combinedReadState: readState.flatMap(EnginePeerReadCounters.init),
                         isRemovedFromTotalUnreadCount: false,
                         presence: nil,
                         hasUnseenMentions: false,
@@ -99,8 +96,7 @@ private enum ChatListSearchEntry: Comparable, Identifiable {
                         promoInfo: nil,
                         ignoreUnreadBadge: true,
                         displayAsMessage: true,
-                        hasFailedMessages: false,
-                        forumTopicData: nil
+                        hasFailedMessages: false
                     ),
                     editing: false,
                     hasActiveRevealControls: false,
@@ -139,8 +135,6 @@ private func chatListSearchContainerPreparedTransition(from fromEntries: [ChatLi
 class ChatSearchResultsControllerNode: ViewControllerTracingNode, UIScrollViewDelegate {
     private let context: AccountContext
     private var presentationData: PresentationData
-    private let animationCache: AnimationCache
-    private let animationRenderer: MultiAnimationRenderer
     private let location: SearchMessagesLocation
     private let searchQuery: String
     private var searchResult: SearchMessagesResult
@@ -175,9 +169,6 @@ class ChatSearchResultsControllerNode: ViewControllerTracingNode, UIScrollViewDe
         self.presentationData = presentationData
         self.presentationDataPromise = Promise(ChatListPresentationData(theme: self.presentationData.theme, fontSize: self.presentationData.listsFontSize, strings: self.presentationData.strings, dateTimeFormat: self.presentationData.dateTimeFormat, nameSortOrder: self.presentationData.nameSortOrder, nameDisplayOrder: self.presentationData.nameDisplayOrder, disableAnimations: true))
         
-        self.animationCache = context.animationCache
-        self.animationRenderer = context.animationRenderer
-        
         self.listNode = ListView()
         self.listNode.verticalScrollIndicatorColor = self.presentationData.theme.list.scrollIndicatorColor
         self.listNode.accessibilityPageScrolledString = { row, count in
@@ -207,13 +198,13 @@ class ChatSearchResultsControllerNode: ViewControllerTracingNode, UIScrollViewDe
             return entries
         }
         
-        let interaction = ChatListNodeInteraction(context: context, animationCache: self.animationCache, animationRenderer: self.animationRenderer, activateSearch: {
-        }, peerSelected: { _, _, _, _ in
-        }, disabledPeerSelected: { _, _ in
-        }, togglePeerSelected: { _, _ in
+        let interaction = ChatListNodeInteraction(activateSearch: {
+        }, peerSelected: { _, _, _ in
+        }, disabledPeerSelected: { _ in
+        }, togglePeerSelected: { _ in
         }, togglePeersSelection: { _, _ in
         }, additionalCategorySelected: { _ in
-        }, messageSelected: { [weak self] peer, _, message, _ in
+        }, messageSelected: { [weak self] peer, message, _ in
             if let strongSelf = self {
                 if let index = strongSelf.searchResult.messages.firstIndex(where: { $0.index == message.index }) {
                     if message.id.peerId.namespace == Namespaces.Peer.SecretChat {
@@ -229,23 +220,18 @@ class ChatSearchResultsControllerNode: ViewControllerTracingNode, UIScrollViewDe
         }, setPeerIdWithRevealedOptions: { _, _ in
         }, setItemPinned: { _, _ in
         }, setPeerMuted: { _, _ in
-        }, setPeerThreadMuted: { _, _, _ in
         }, deletePeer: { _, _ in
-        }, deletePeerThread: { _, _ in
-        }, setPeerThreadStopped: { _, _, _ in
-        }, setPeerThreadPinned: { _, _, _ in
         }, updatePeerGrouping: { _, _ in
         }, togglePeerMarkedUnread: { _, _ in
         }, toggleArchivedFolderHiddenByDefault: {
-        }, toggleThreadsSelection: { _, _ in
         }, hidePsa: { _ in
-        }, activateChatPreview: { [weak self] item, node, gesture, _ in
+        }, activateChatPreview: { [weak self] item, node, gesture in
             guard let strongSelf = self else {
                 gesture?.cancel()
                 return
             }
             switch item.content {
-            case let .peer(messages, peer, _, _, _, _, _, _, _, _, _, _, _, _, _):
+            case let .peer(messages, peer, _, _, _, _, _, _, _, _, _, _, _):
                 if let message = messages.first {
                     let chatController = strongSelf.context.sharedContext.makeChatController(context: strongSelf.context, chatLocation: .peer(id: peer.peerId), subject: .message(id: .id(message.id), highlight: true, timecode: nil), botStart: nil, mode: .standard(previewing: true))
                     chatController.canReadHistory.set(false)
@@ -412,7 +398,7 @@ private final class ContextControllerContentSourceImpl: ContextControllerContent
         let sourceNode = self.sourceNode
         return ContextControllerTakeControllerInfo(contentAreaInScreenSpace: CGRect(origin: CGPoint(), size: CGSize(width: 10.0, height: 10.0)), sourceNode: { [weak sourceNode] in
             if let sourceNode = sourceNode {
-                return (sourceNode.view, sourceNode.bounds)
+                return (sourceNode, sourceNode.bounds)
             } else {
                 return nil
             }

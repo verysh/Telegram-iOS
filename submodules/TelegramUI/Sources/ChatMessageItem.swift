@@ -87,7 +87,7 @@ private func mediaMergeableStyle(_ media: Media) -> ChatMessageMerge {
                     return .semanticallyMerged
                 case let .Video(_, _, flags):
                     if flags.contains(.instantRoundVideo) {
-                        return .none
+                        return .semanticallyMerged
                     }
                 default:
                     break
@@ -177,7 +177,7 @@ private func messagesShouldBeMerged(accountPeerId: PeerId, _ lhs: Message, _ rhs
         for attribute in lhs.attributes {
             if let attribute = attribute as? ReplyMarkupMessageAttribute {
                 if attribute.flags.contains(.inline) && !attribute.rows.isEmpty {
-                    upperStyle = ChatMessageMerge.none.rawValue
+                    upperStyle = ChatMessageMerge.semanticallyMerged.rawValue
                 }
                 break
             }
@@ -305,7 +305,7 @@ public final class ChatMessageItem: ListViewItem, CustomStringConvertible {
                 if let forwardInfo = content.firstMessage.forwardInfo {
                     effectiveAuthor = forwardInfo.author
                     if effectiveAuthor == nil, let authorSignature = forwardInfo.authorSignature  {
-                        effectiveAuthor = TelegramUser(id: PeerId(namespace: Namespaces.Peer.Empty, id: PeerId.Id._internalFromInt64Value(Int64(authorSignature.persistentHashValue % 32))), accessHash: nil, firstName: authorSignature, lastName: nil, username: nil, phone: nil, photo: [], botInfo: nil, restrictionInfo: nil, flags: [], emojiStatus: nil, usernames: [])
+                        effectiveAuthor = TelegramUser(id: PeerId(namespace: Namespaces.Peer.Empty, id: PeerId.Id._internalFromInt64Value(Int64(authorSignature.persistentHashValue % 32))), accessHash: nil, firstName: authorSignature, lastName: nil, username: nil, phone: nil, photo: [], botInfo: nil, restrictionInfo: nil, flags: UserInfoFlags())
                     }
                 }
                 displayAuthorInfo = incoming && effectiveAuthor != nil
@@ -328,7 +328,7 @@ public final class ChatMessageItem: ListViewItem, CustomStringConvertible {
             isScheduledMessages = true
         }
         
-        self.dateHeader = ChatMessageDateHeader(timestamp: content.index.timestamp, scheduled: isScheduledMessages, presentationData: presentationData, controllerInteraction: controllerInteraction, context: context, action: { timestamp, alreadyThere in
+        self.dateHeader = ChatMessageDateHeader(timestamp: content.index.timestamp, scheduled: isScheduledMessages, presentationData: presentationData, context: context, action: { timestamp, alreadyThere in
             var calendar = NSCalendar.current
             calendar.timeZone = TimeZone(abbreviation: "UTC")!
             let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
@@ -356,19 +356,7 @@ public final class ChatMessageItem: ListViewItem, CustomStringConvertible {
             } else if case let .replyThread(replyThreadMessage) = chatLocation, replyThreadMessage.isChannelPost, replyThreadMessage.effectiveTopId == message.id {
                 isBroadcastChannel = true
             }
-            
-            var hasAvatar = false
             if !hasActionMedia && !isBroadcastChannel {
-                hasAvatar = true
-            }
-            
-            if let adAttribute = message.adAttribute {
-                if adAttribute.displayAvatar {
-                    hasAvatar = adAttribute.displayAvatar
-                }
-            }
-            
-            if hasAvatar {
                 if let effectiveAuthor = effectiveAuthor {
                     avatarHeader = ChatMessageAvatarHeader(timestamp: content.index.timestamp, peerId: effectiveAuthor.id, peer: effectiveAuthor, messageReference: MessageReference(message), message: message, presentationData: presentationData, context: context, controllerInteraction: controllerInteraction)
                 }
@@ -431,8 +419,7 @@ public final class ChatMessageItem: ListViewItem, CustomStringConvertible {
                             break loop
                         case let .Video(_, _, flags):
                             if flags.contains(.instantRoundVideo) {
-//                                viewClassName = ChatMessageInstantVideoItemNode.self
-                                viewClassName = ChatMessageBubbleItemNode.self
+                                viewClassName = ChatMessageInstantVideoItemNode.self
                                 break loop
                             }
                         default:

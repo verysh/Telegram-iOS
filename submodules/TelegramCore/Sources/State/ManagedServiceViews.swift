@@ -7,7 +7,6 @@ func managedServiceViews(accountPeerId: PeerId, network: Network, postbox: Postb
         let disposable = DisposableSet()
         disposable.add(managedMessageHistoryHoles(accountPeerId: accountPeerId, network: network, postbox: postbox).start())
         disposable.add(managedChatListHoles(network: network, postbox: postbox, accountPeerId: accountPeerId).start())
-        disposable.add(managedForumTopicListHoles(network: network, postbox: postbox, accountPeerId: accountPeerId).start())
         disposable.add(managedSynchronizePeerReadStates(network: network, postbox: postbox, stateManager: stateManager).start())
         disposable.add(managedSynchronizeGroupMessageStats(network: network, postbox: postbox, stateManager: stateManager).start())
         

@@ -115,7 +115,7 @@ final class ChatButtonKeyboardInputNode: ChatInputNode {
         }
     }
     
-    override func updateLayout(width: CGFloat, leftInset: CGFloat, rightInset: CGFloat, bottomInset: CGFloat, standardInputHeight: CGFloat, inputHeight: CGFloat, maximumHeight: CGFloat, inputPanelHeight: CGFloat, transition: ContainedViewLayoutTransition, interfaceState: ChatPresentationInterfaceState, deviceMetrics: DeviceMetrics, isVisible: Bool, isExpanded: Bool) -> (CGFloat, CGFloat) {
+    override func updateLayout(width: CGFloat, leftInset: CGFloat, rightInset: CGFloat, bottomInset: CGFloat, standardInputHeight: CGFloat, inputHeight: CGFloat, maximumHeight: CGFloat, inputPanelHeight: CGFloat, transition: ContainedViewLayoutTransition, interfaceState: ChatPresentationInterfaceState, deviceMetrics: DeviceMetrics, isVisible: Bool) -> (CGFloat, CGFloat) {
         transition.updateFrame(node: self.separatorNode, frame: CGRect(origin: CGPoint(), size: CGSize(width: width, height: UIScreenPixel)))
         
         let updatedTheme = self.theme !== interfaceState.theme
@@ -242,14 +242,12 @@ final class ChatButtonKeyboardInputNode: ChatInputNode {
                             botPeer = message.author
                         }
                         
-                        var peer: Peer?
+                        var peerId: PeerId?
                         if samePeer {
-                            peer = message.peers[message.id.peerId]
-                        } else {
-                            peer = botPeer
+                            peerId = message.id.peerId
                         }
-                        if let peer = peer, let botPeer = botPeer, let addressName = botPeer.addressName {
-                            self.controllerInteraction.openPeer(EnginePeer(peer), .chat(textInputState: ChatTextInputState(inputText: NSAttributedString(string: "@\(addressName) \(query)")), subject: nil, peekData: nil), nil, false)
+                        if let botPeer = botPeer, let addressName = botPeer.addressName {
+                            self.controllerInteraction.openPeer(peerId, .chat(textInputState: ChatTextInputState(inputText: NSAttributedString(string: "@\(addressName) \(query)")), subject: nil, peekData: nil), nil, nil)
                         }
                     }
                 case .payment:
@@ -261,13 +259,7 @@ final class ChatButtonKeyboardInputNode: ChatInputNode {
                 case let .setupPoll(isQuiz):
                     self.controllerInteraction.openPollCreation(isQuiz)
                 case let .openUserProfile(peerId):
-                    let _ = (self.context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: peerId))
-                    |> deliverOnMainQueue).start(next: { [weak self] peer in
-                        guard let self, let peer else {
-                            return
-                        }
-                        self.controllerInteraction.openPeer(peer, .info, nil, false)
-                    })
+                    self.controllerInteraction.openPeer(peerId, .info, nil, nil)
                 case let .openWebView(url, simple):
                     self.controllerInteraction.openWebView(markupButton.title, url, simple, false)
             }

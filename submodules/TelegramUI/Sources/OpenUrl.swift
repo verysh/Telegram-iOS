@@ -190,27 +190,30 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
             if case let .externalUrl(value) = resolved {
                 context.sharedContext.applicationBindings.openUrl(value)
             } else {
-                context.sharedContext.openResolvedUrl(resolved, context: context, urlContext: .generic, navigationController: navigationController, forceExternal: false, openPeer: { peer, navigation in
+                context.sharedContext.openResolvedUrl(resolved, context: context, urlContext: .generic, navigationController: navigationController, forceExternal: false, openPeer: { peerId, navigation in
                     switch navigation {
                         case .info:
-                            if let infoController = context.sharedContext.makePeerInfoController(context: context, updatedPresentationData: nil, peer: peer._asPeer(), mode: .generic, avatarInitiallyExpanded: false, fromChat: false, requestsContext: nil) {
-                                context.sharedContext.applicationBindings.dismissNativeController()
-                                navigationController?.pushViewController(infoController)
-                            }
+                            let _ = (context.account.postbox.loadedPeerWithId(peerId)
+                            |> deliverOnMainQueue).start(next: { peer in
+                                if let infoController = context.sharedContext.makePeerInfoController(context: context, updatedPresentationData: nil, peer: peer, mode: .generic, avatarInitiallyExpanded: false, fromChat: false, requestsContext: nil) {
+                                    context.sharedContext.applicationBindings.dismissNativeController()
+                                    navigationController?.pushViewController(infoController)
+                                }
+                            })
                         case let .chat(_, subject, peekData):
                             context.sharedContext.applicationBindings.dismissNativeController()
                             if let navigationController = navigationController {
-                                context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, context: context, chatLocation: .peer(peer), subject: subject, peekData: peekData))
+                                context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, context: context, chatLocation: .peer(id: peerId), subject: subject, peekData: peekData))
                             }
                         case let .withBotStartPayload(payload):
                             context.sharedContext.applicationBindings.dismissNativeController()
                             if let navigationController = navigationController {
-                                context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, context: context, chatLocation: .peer(peer), botStart: payload))
+                                context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, context: context, chatLocation: .peer(id: peerId), botStart: payload))
                             }
                         case let .withAttachBot(attachBotStart):
                             context.sharedContext.applicationBindings.dismissNativeController()
                             if let navigationController = navigationController {
-                                context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, context: context, chatLocation: .peer(peer), attachBotStart: attachBotStart))
+                                context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, context: context, chatLocation: .peer(id: peerId), attachBotStart: attachBotStart))
                             }
                         default:
                             break
@@ -290,22 +293,6 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                         }
                         if let set = set {
                             convertedUrl = "https://t.me/addstickers/\(set)"
-                        }
-                    }
-                } else if parsedUrl.host == "addemoji" {
-                    if let components = URLComponents(string: "/?" + query) {
-                        var set: String?
-                        if let queryItems = components.queryItems {
-                            for queryItem in queryItems {
-                                if let value = queryItem.value {
-                                    if queryItem.name == "set" {
-                                        set = value
-                                    }
-                                }
-                            }
-                        }
-                        if let set = set {
-                            convertedUrl = "https://t.me/addemoji/\(set)"
                         }
                     }
                 } else if parsedUrl.host == "invoice" {
@@ -644,7 +631,6 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                         var domain: String?
                         var start: String?
                         var startGroup: String?
-                        var startChannel: String?
                         var admin: String?
                         var game: String?
                         var post: String?
@@ -682,10 +668,6 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                                     voiceChat = ""
                                 } else if queryItem.name == "startattach" {
                                     startAttach = ""
-                                } else if queryItem.name == "startgroup" {
-                                    startGroup = ""
-                                } else if queryItem.name == "startchannel" {
-                                    startChannel = ""
                                 }
                             }
                         }
@@ -700,20 +682,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                             if let start = start {
                                 result += "?start=\(start)"
                             } else if let startGroup = startGroup {
-                                if !startGroup.isEmpty {
-                                    result += "?startgroup=\(startGroup)"
-                                } else {
-                                    result += "?startgroup"
-                                }
-                                if let admin = admin {
-                                    result += "&admin=\(admin)"
-                                }
-                            } else if let startChannel = startChannel {
-                                if !startChannel.isEmpty {
-                                    result += "?startchannel=\(startChannel)"
-                                } else {
-                                    result += "?startchannel"
-                                }
+                                result += "?startgroup=\(startGroup)"
                                 if let admin = admin {
                                     result += "&admin=\(admin)"
                                 }

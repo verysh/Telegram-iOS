@@ -52,13 +52,13 @@ public final class ToolbarNode: ASDisplayNode {
         
         self.leftTitle = ImmediateTextNode()
         self.leftTitle.displaysAsynchronously = false
-        self.leftButton = HighlightTrackingButtonNode(pointerStyle: .insetRectangle(2.0, 2.0))
+        self.leftButton = HighlightTrackingButtonNode()
         self.rightTitle = ImmediateTextNode()
         self.rightTitle.displaysAsynchronously = false
-        self.rightButton = HighlightTrackingButtonNode(pointerStyle: .insetRectangle(2.0, 2.0))
+        self.rightButton = HighlightTrackingButtonNode()
         self.middleTitle = ImmediateTextNode()
         self.middleTitle.displaysAsynchronously = false
-        self.middleButton = HighlightTrackingButtonNode(pointerStyle: .insetRectangle(2.0, 2.0))
+        self.middleButton = HighlightTrackingButtonNode()
         
         super.init()
         

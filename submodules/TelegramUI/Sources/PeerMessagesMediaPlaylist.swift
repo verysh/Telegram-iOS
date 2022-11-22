@@ -111,7 +111,7 @@ final class MessageMediaPlaylistItem: SharedMediaPlaylistItem {
                             if file.fileName?.lowercased().hasSuffix(".ogg") == true {
                                 albumArt = nil
                             } else {
-                                albumArt = SharedMediaPlaybackAlbumArt(thumbnailResource: ExternalMusicAlbumArtResource(file: .message(message: MessageReference(self.message), media: file), title: updatedTitle ?? "", performer: updatedPerformer ?? "", isThumbnail: true), fullSizeResource: ExternalMusicAlbumArtResource(file: .message(message: MessageReference(self.message), media: file), title: updatedTitle ?? "", performer: updatedPerformer ?? "", isThumbnail: false))
+                                albumArt = SharedMediaPlaybackAlbumArt(thumbnailResource: ExternalMusicAlbumArtResource(title: updatedTitle ?? "", performer: updatedPerformer ?? "", isThumbnail: true), fullSizeResource: ExternalMusicAlbumArtResource(title: updatedTitle ?? "", performer: updatedPerformer ?? "", isThumbnail: false))
                             }
                             
                             return SharedMediaPlaybackDisplayData.music(title: updatedTitle, performer: updatedPerformer, albumArt: albumArt, long: CGFloat(duration) > 10.0 * 60.0)
@@ -347,12 +347,12 @@ final class PeerMessagesMediaPlaylist: SharedMediaPlaylist {
         self.messagesLocation = location
         
         switch self.messagesLocation {
-        case let .messages(_, _, messageId), let .singleMessage(messageId), let .custom(_, messageId, _):
-            self.loadItem(anchor: .messageId(messageId), navigation: .later)
-        case let .recentActions(message):
-            self.loadingItem = false
-            self.currentItem = (message, [])
-            self.updateState()
+            case let .messages(_, _, messageId), let .singleMessage(messageId), let .custom(_, messageId, _):
+                self.loadItem(anchor: .messageId(messageId), navigation: .later)
+            case let .recentActions(message):
+                self.loadingItem = false
+                self.currentItem = (message, [])
+                self.updateState()
         }
     }
     

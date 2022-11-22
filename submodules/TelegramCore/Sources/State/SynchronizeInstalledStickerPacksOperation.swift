@@ -14,8 +14,6 @@ public func addSynchronizeInstalledStickerPacksOperation(transaction: Transactio
             operationNamespace = .stickers
         case Namespaces.ItemCollection.CloudMaskPacks:
             operationNamespace = .masks
-        case Namespaces.ItemCollection.CloudEmojiPacks:
-            operationNamespace = .emoji
         default:
             return
     }
@@ -33,9 +31,6 @@ func addSynchronizeInstalledStickerPacksOperation(transaction: Transaction, name
         case .masks:
             tag = OperationLogTags.SynchronizeInstalledMasks
             itemCollectionNamespace = Namespaces.ItemCollection.CloudMaskPacks
-        case .emoji:
-            tag = OperationLogTags.SynchronizeInstalledEmoji
-            itemCollectionNamespace = Namespaces.ItemCollection.CloudEmojiPacks
     }
     var previousStickerPackIds: [ItemCollectionId]?
     var archivedPacks: [ItemCollectionId] = []

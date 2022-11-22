@@ -64,11 +64,7 @@ public func tagsForStoreMessage(incoming: Bool, attributes: [MessageAttribute], 
                         if isVoice {
                             refinedTag = .voiceOrInstantVideo
                         } else {
-                            if file.isInstantVideo {
-                                refinedTag = .voiceOrInstantVideo
-                            } else {
-                                refinedTag = .music
-                            }
+                            refinedTag = .music
                         }
                         break inner
                     case .Sticker:
@@ -205,7 +201,7 @@ func apiMessagePeerIds(_ message: Api.Message) -> [PeerId] {
             }
             
             switch action {
-            case .messageActionChannelCreate, .messageActionChatDeletePhoto, .messageActionChatEditPhoto, .messageActionChatEditTitle, .messageActionEmpty, .messageActionPinMessage, .messageActionHistoryClear, .messageActionGameScore, .messageActionPaymentSent, .messageActionPaymentSentMe, .messageActionPhoneCall, .messageActionScreenshotTaken, .messageActionCustomAction, .messageActionBotAllowed, .messageActionSecureValuesSent, .messageActionSecureValuesSentMe, .messageActionContactSignUp, .messageActionGroupCall, .messageActionSetMessagesTTL, .messageActionGroupCallScheduled, .messageActionSetChatTheme, .messageActionChatJoinedByRequest, .messageActionWebViewDataSent, .messageActionWebViewDataSentMe, .messageActionGiftPremium, .messageActionTopicCreate, .messageActionTopicEdit:
+            case .messageActionChannelCreate, .messageActionChatDeletePhoto, .messageActionChatEditPhoto, .messageActionChatEditTitle, .messageActionEmpty, .messageActionPinMessage, .messageActionHistoryClear, .messageActionGameScore, .messageActionPaymentSent, .messageActionPaymentSentMe, .messageActionPhoneCall, .messageActionScreenshotTaken, .messageActionCustomAction, .messageActionBotAllowed, .messageActionSecureValuesSent, .messageActionSecureValuesSentMe, .messageActionContactSignUp, .messageActionGroupCall, .messageActionSetMessagesTTL, .messageActionGroupCallScheduled, .messageActionSetChatTheme, .messageActionChatJoinedByRequest, .messageActionWebViewDataSent, .messageActionWebViewDataSentMe:
                     break
                 case let .messageActionChannelMigrateFrom(_, chatId):
                     result.append(PeerId(namespace: Namespaces.Peer.CloudGroup, id: PeerId.Id._internalFromInt64Value(chatId)))
@@ -260,7 +256,7 @@ func apiMessageAssociatedMessageIds(_ message: Api.Message) -> [MessageId]? {
     return nil
 }
 
-func textMediaAndExpirationTimerFromApiMedia(_ media: Api.MessageMedia?, _ peerId: PeerId) -> (Media?, Int32?, Bool?) {
+func textMediaAndExpirationTimerFromApiMedia(_ media: Api.MessageMedia?, _ peerId:PeerId) -> (Media?, Int32?, Bool?) {
     if let media = media {
         switch media {
         case let .messageMediaPhoto(_, photo, ttlSeconds):
@@ -302,7 +298,7 @@ func textMediaAndExpirationTimerFromApiMedia(_ media: Api.MessageMedia?, _ peerI
             break
         case let .messageMediaGame(game):
             return (TelegramMediaGame(apiGame: game), nil, nil)
-        case let .messageMediaInvoice(flags, title, description, photo, receiptMsgId, currency, totalAmount, startParam, apiExtendedMedia):
+        case let .messageMediaInvoice(flags, title, description, photo, receiptMsgId, currency, totalAmount, startParam):
             var parsedFlags = TelegramMediaInvoiceFlags()
             if (flags & (1 << 3)) != 0 {
                 parsedFlags.insert(.isTest)
@@ -310,33 +306,7 @@ func textMediaAndExpirationTimerFromApiMedia(_ media: Api.MessageMedia?, _ peerI
             if (flags & (1 << 1)) != 0 {
                 parsedFlags.insert(.shippingAddressRequested)
             }
-            
-            let extendedMedia: TelegramExtendedMedia?
-            if let apiExtendedMedia = apiExtendedMedia {
-                switch apiExtendedMedia {
-                    case let .messageExtendedMediaPreview(_, width, height, thumb, videoDuration):
-                        var dimensions: PixelDimensions?
-                        if let width = width, let height = height {
-                            dimensions = PixelDimensions(width: width, height: height)
-                        }
-                        var immediateThumbnailData: Data?
-                        if let thumb = thumb, case let .photoStrippedSize(_, bytes) = thumb {
-                            immediateThumbnailData = bytes.makeData()
-                        }
-                        extendedMedia = .preview(dimensions: dimensions, immediateThumbnailData: immediateThumbnailData, videoDuration: videoDuration)
-                    case let .messageExtendedMedia(apiMedia):
-                        let (media, _, _) = textMediaAndExpirationTimerFromApiMedia(apiMedia, peerId)
-                        if let media = media {
-                            extendedMedia = .full(media: media)
-                        } else {
-                            extendedMedia = nil
-                        }
-                }
-            } else {
-                extendedMedia = nil
-            }
-            
-            return (TelegramMediaInvoice(title: title, description: description, photo: photo.flatMap(TelegramMediaWebFile.init), receiptMessageId: receiptMsgId.flatMap { MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: $0) }, currency: currency, totalAmount: totalAmount, startParam: startParam, extendedMedia: extendedMedia, flags: parsedFlags, version: TelegramMediaInvoice.lastVersion), nil, nil)
+            return (TelegramMediaInvoice(title: title, description: description, photo: photo.flatMap(TelegramMediaWebFile.init), receiptMessageId: receiptMsgId.flatMap { MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: $0) }, currency: currency, totalAmount: totalAmount, startParam: startParam, flags: parsedFlags), nil, nil)
         case let .messageMediaPoll(poll, results):
             switch poll {
             case let .poll(id, flags, question, answers, closePeriod, _):
@@ -404,8 +374,8 @@ func messageTextEntitiesFromApiEntities(_ entities: [Api.MessageEntity]) -> [Mes
             result.append(MessageTextEntity(range: Int(offset) ..< Int(offset + length), type: .BankCard))
         case let .messageEntitySpoiler(offset, length):
             result.append(MessageTextEntity(range: Int(offset) ..< Int(offset + length), type: .Spoiler))
-        case let .messageEntityCustomEmoji(offset, length, documentId):
-            result.append(MessageTextEntity(range: Int(offset) ..< Int(offset + length), type: .CustomEmoji(stickerPack: nil, fileId: documentId)))
+        /*case let .messageEntityAnimatedEmoji(offset, length):
+            result.append(MessageTextEntity(range: Int(offset) ..< Int(offset + length), type: .AnimatedEmoji(nil)))*/
         }
     }
     return result
@@ -636,10 +606,6 @@ extension StoreMessage {
                 if (flags & (1 << 26)) != 0 {
                     storeFlags.insert(.CopyProtected)
                 }
-            
-                if (flags & (1 << 27)) != 0 {
-                    storeFlags.insert(.IsForumTopic)
-                }
                 
                 if (flags & (1 << 4)) != 0 || (flags & (1 << 13)) != 0 {
                     var notificationFlags: NotificationInfoMessageAttributeFlags = []
@@ -681,25 +647,8 @@ extension StoreMessage {
                             if replyPeerId == peerId {
                                 threadId = makeMessageThreadId(threadIdValue)
                             }
-                        } else if peerId.namespace == Namespaces.Peer.CloudChannel {
-                            let threadIdValue = MessageId(peerId: replyPeerId, namespace: Namespaces.Message.Cloud, id: replyToMsgId)
-                            threadMessageId = threadIdValue
-                            threadId = makeMessageThreadId(threadIdValue)
-                        }
-                        switch action {
-                        case .messageActionTopicEdit:
-                            threadId = Int64(replyToMsgId)
-                        default:
-                            break
                         }
                         attributes.append(ReplyMessageAttribute(messageId: MessageId(peerId: replyPeerId, namespace: Namespaces.Message.Cloud, id: replyToMsgId), threadMessageId: threadMessageId))
-                    }
-                } else {
-                    switch action {
-                    case .messageActionTopicCreate:
-                        threadId = Int64(id)
-                    default:
-                        break
                     }
                 }
                 
@@ -747,10 +696,6 @@ extension StoreMessage {
             
                 if (flags & (1 << 26)) != 0 {
                     storeFlags.insert(.CopyProtected)
-                }
-            
-                if (flags & (1 << 27)) != 0 {
-                    storeFlags.insert(.IsForumTopic)
                 }
                 
                 self.init(id: MessageId(peerId: peerId, namespace: namespace, id: id), globallyUniqueId: nil, groupingKey: nil, threadId: threadId, timestamp: date, flags: storeFlags, tags: tags, globalTags: globalTags, localTags: [], forwardInfo: nil, authorId: authorId, text: "", attributes: attributes, media: media)

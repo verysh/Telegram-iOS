@@ -7,12 +7,10 @@ import Display
 public final class BundleIconComponent: Component {
     public let name: String
     public let tintColor: UIColor?
-    public let maxSize: CGSize?
     
-    public init(name: String, tintColor: UIColor?, maxSize: CGSize? = nil) {
+    public init(name: String, tintColor: UIColor?) {
         self.name = name
         self.tintColor = tintColor
-        self.maxSize = maxSize
     }
     
     public static func ==(lhs: BundleIconComponent, rhs: BundleIconComponent) -> Bool {
@@ -20,9 +18,6 @@ public final class BundleIconComponent: Component {
             return false
         }
         if lhs.tintColor != rhs.tintColor {
-            return false
-        }
-        if lhs.maxSize != rhs.maxSize {
             return false
         }
         return true
@@ -49,10 +44,7 @@ public final class BundleIconComponent: Component {
             }
             self.component = component
             
-            var imageSize = self.image?.size ?? CGSize()
-            if let maxSize = component.maxSize {
-                imageSize = imageSize.aspectFitted(maxSize)
-            }
+            let imageSize = self.image?.size ?? CGSize()
             
             return CGSize(width: min(imageSize.width, availableSize.width), height: min(imageSize.height, availableSize.height))
         }

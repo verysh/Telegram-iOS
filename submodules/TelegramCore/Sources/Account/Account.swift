@@ -321,14 +321,13 @@ public struct TwoStepAuthData {
     public let secretRandom: Data
     public let nextSecurePasswordDerivation: TwoStepSecurePasswordDerivation
     public let pendingResetTimestamp: Int32?
-    public let loginEmailPattern: String?
 }
 
 func _internal_twoStepAuthData(_ network: Network) -> Signal<TwoStepAuthData, MTRpcError> {
     return network.request(Api.functions.account.getPassword())
     |> map { config -> TwoStepAuthData in
         switch config {
-            case let .password(flags, currentAlgo, srpB, srpId, hint, emailUnconfirmedPattern, newAlgo, newSecureAlgo, secureRandom, pendingResetDate, loginEmailPattern):
+            case let .password(flags, currentAlgo, srpB, srpId, hint, emailUnconfirmedPattern, newAlgo, newSecureAlgo, secureRandom, pendingResetDate):
                 let hasRecovery = (flags & (1 << 0)) != 0
                 let hasSecureValues = (flags & (1 << 1)) != 0
                 
@@ -350,7 +349,7 @@ func _internal_twoStepAuthData(_ network: Network) -> Signal<TwoStepAuthData, MT
                     srpSessionData = TwoStepSRPSessionData(id: srpId, B: srpB.makeData())
                 }
                 
-                return TwoStepAuthData(nextPasswordDerivation: nextDerivation, currentPasswordDerivation: currentDerivation, srpSessionData: srpSessionData, hasRecovery: hasRecovery, hasSecretValues: hasSecureValues, currentHint: hint, unconfirmedEmailPattern: emailUnconfirmedPattern, secretRandom: secureRandom.makeData(), nextSecurePasswordDerivation: nextSecureDerivation, pendingResetTimestamp: pendingResetDate, loginEmailPattern: loginEmailPattern)
+                return TwoStepAuthData(nextPasswordDerivation: nextDerivation, currentPasswordDerivation: currentDerivation, srpSessionData: srpSessionData, hasRecovery: hasRecovery, hasSecretValues: hasSecureValues, currentHint: hint, unconfirmedEmailPattern: emailUnconfirmedPattern, secretRandom: secureRandom.makeData(), nextSecurePasswordDerivation: nextSecureDerivation, pendingResetTimestamp: pendingResetDate)
         }
     }
 }
@@ -894,7 +893,6 @@ public class Account {
     private let becomeMasterDisposable = MetaDisposable()
     private let managedServiceViewsDisposable = MetaDisposable()
     private let managedOperationsDisposable = DisposableSet()
-    private let managedTopReactionsDisposable = MetaDisposable()
     private var storageSettingsDisposable: Disposable?
     
     public let importableContacts = Promise<[DeviceContactNormalizedPhoneNumber: ImportableDeviceContactData]>()
@@ -1074,14 +1072,12 @@ public class Account {
         self.managedOperationsDisposable.add(managedCloudChatRemoveMessagesOperations(postbox: self.postbox, network: self.network, stateManager: self.stateManager).start())
         self.managedOperationsDisposable.add(managedAutoremoveMessageOperations(network: self.network, postbox: self.postbox, isRemove: true).start())
         self.managedOperationsDisposable.add(managedAutoremoveMessageOperations(network: self.network, postbox: self.postbox, isRemove: false).start())
-        self.managedOperationsDisposable.add(managedPeerTimestampAttributeOperations(network: self.network, postbox: self.postbox).start())
         self.managedOperationsDisposable.add(managedGlobalNotificationSettings(postbox: self.postbox, network: self.network).start())
         self.managedOperationsDisposable.add(managedSynchronizePinnedChatsOperations(postbox: self.postbox, network: self.network, accountPeerId: self.peerId, stateManager: self.stateManager).start())
         
         self.managedOperationsDisposable.add(managedSynchronizeGroupedPeersOperations(postbox: self.postbox, network: self.network, stateManager: self.stateManager).start())
         self.managedOperationsDisposable.add(managedSynchronizeInstalledStickerPacksOperations(postbox: self.postbox, network: self.network, stateManager: self.stateManager, namespace: .stickers).start())
         self.managedOperationsDisposable.add(managedSynchronizeInstalledStickerPacksOperations(postbox: self.postbox, network: self.network, stateManager: self.stateManager, namespace: .masks).start())
-        self.managedOperationsDisposable.add(managedSynchronizeInstalledStickerPacksOperations(postbox: self.postbox, network: self.network, stateManager: self.stateManager, namespace: .emoji).start())
         self.managedOperationsDisposable.add(managedSynchronizeMarkFeaturedStickerPacksAsSeenOperations(postbox: self.postbox, network: self.network).start())
         self.managedOperationsDisposable.add(managedSynchronizeRecentlyUsedMediaOperations(postbox: self.postbox, network: self.network, category: .stickers, revalidationContext: self.mediaReferenceRevalidationContext).start())
         self.managedOperationsDisposable.add(managedSynchronizeSavedGifsOperations(postbox: self.postbox, network: self.network, revalidationContext: self.mediaReferenceRevalidationContext).start())
@@ -1173,20 +1169,9 @@ public class Account {
         if !self.supplementary {
             self.managedOperationsDisposable.add(managedAnimatedEmojiUpdates(postbox: self.postbox, network: self.network).start())
             self.managedOperationsDisposable.add(managedAnimatedEmojiAnimationsUpdates(postbox: self.postbox, network: self.network).start())
-            self.managedOperationsDisposable.add(managedGenericEmojiEffects(postbox: self.postbox, network: self.network).start())
-            
-            self.managedOperationsDisposable.add(managedGreetingStickers(postbox: self.postbox, network: self.network).start())
-            self.managedOperationsDisposable.add(managedPremiumStickers(postbox: self.postbox, network: self.network).start())
-            self.managedOperationsDisposable.add(managedAllPremiumStickers(postbox: self.postbox, network: self.network).start())
-            self.managedOperationsDisposable.add(managedRecentStatusEmoji(postbox: self.postbox, network: self.network).start())
-            self.managedOperationsDisposable.add(managedFeaturedStatusEmoji(postbox: self.postbox, network: self.network).start())
-            self.managedOperationsDisposable.add(managedRecentReactions(postbox: self.postbox, network: self.network).start())
-            self.managedTopReactionsDisposable.set(managedTopReactions(postbox: self.postbox, network: self.network).start())
-            self.managedOperationsDisposable.add(self.managedTopReactionsDisposable)
-            
-            self.managedOperationsDisposable.add(_internal_loadedStickerPack(postbox: self.postbox, network: self.network, reference: .iconStatusEmoji, forceActualized: true).start())
-            self.managedOperationsDisposable.add(_internal_loadedStickerPack(postbox: self.postbox, network: self.network, reference: .iconTopicEmoji, forceActualized: true).start())
         }
+        self.managedOperationsDisposable.add(managedGreetingStickers(postbox: self.postbox, network: self.network).start())
+        self.managedOperationsDisposable.add(managedPremiumStickers(postbox: self.postbox, network: self.network).start())
 
         if !supplementary {
             let mediaBox = postbox.mediaBox
@@ -1210,13 +1195,6 @@ public class Account {
             self?.restartConfigurationUpdates()
         }
         self.restartConfigurationUpdates()
-        
-        self.stateManager.isPremiumUpdated = { [weak self] in
-            guard let strongSelf = self else {
-                return
-            }
-            strongSelf.managedTopReactionsDisposable.set(managedTopReactions(postbox: strongSelf.postbox, network: strongSelf.network).start())
-        }
         
         /*#if DEBUG
         self.managedOperationsDisposable.add(debugFetchAllStickers(account: self).start(completed: {

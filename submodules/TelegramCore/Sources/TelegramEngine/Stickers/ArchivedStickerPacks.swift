@@ -7,7 +7,6 @@ import SwiftSignalKit
 public enum ArchivedStickerPacksNamespace: Int32 {
     case stickers = 0
     case masks = 1
-    case emoji = 2
     
     var itemCollectionNamespace: ItemCollectionId.Namespace {
         switch self {
@@ -15,8 +14,6 @@ public enum ArchivedStickerPacksNamespace: Int32 {
                 return Namespaces.ItemCollection.CloudStickerPacks
             case .masks:
                 return Namespaces.ItemCollection.CloudMaskPacks
-            case .emoji:
-                return Namespaces.ItemCollection.CloudEmojiPacks
         }
     }
 }
@@ -35,8 +32,6 @@ func _internal_archivedStickerPacks(account: Account, namespace: ArchivedSticker
     var flags: Int32 = 0
     if case .masks = namespace {
         flags |= 1 << 0
-    } else if case .emoji = namespace {
-        flags |= 1 << 1
     }
     return account.network.request(Api.functions.messages.getArchivedStickers(flags: flags, offsetId: 0, limit: 200))
     |> map { result -> [ArchivedStickerPackItem] in

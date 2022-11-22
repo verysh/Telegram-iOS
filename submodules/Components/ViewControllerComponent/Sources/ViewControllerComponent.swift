@@ -5,7 +5,52 @@ import Display
 import SwiftSignalKit
 import TelegramPresentationData
 import AccountContext
-import ComponentDisplayAdapters
+
+public extension Transition.Animation.Curve {
+    init(_ curve: ContainedViewLayoutTransitionCurve) {
+        switch curve {
+        case .linear:
+            self = .easeInOut
+        case .easeInOut:
+            self = .easeInOut
+        case .custom:
+            self = .spring
+        case .customSpring:
+            self = .spring
+        case .spring:
+            self = .spring
+        }
+    }
+    
+    var containedViewLayoutTransitionCurve: ContainedViewLayoutTransitionCurve {
+        switch self {
+            case .easeInOut:
+                return .easeInOut
+            case .spring:
+                return .spring
+        }
+    }
+}
+
+public extension Transition {
+    init(_ transition: ContainedViewLayoutTransition) {
+        switch transition {
+        case .immediate:
+            self.init(animation: .none)
+        case let .animated(duration, curve):
+            self.init(animation: .curve(duration: duration, curve: Transition.Animation.Curve(curve)))
+        }
+    }
+    
+    var containedViewLayoutTransition: ContainedViewLayoutTransition {
+        switch self.animation {
+            case .none:
+                return .immediate
+            case let .curve(duration, curve):
+                return .animated(duration: duration, curve: curve.containedViewLayoutTransitionCurve)
+        }
+    }
+}
 
 open class ViewControllerComponentContainer: ViewController {
     public enum NavigationBarAppearance {
@@ -24,9 +69,7 @@ open class ViewControllerComponentContainer: ViewController {
         public let statusBarHeight: CGFloat
         public let navigationHeight: CGFloat
         public let safeInsets: UIEdgeInsets
-        public let inputHeight: CGFloat
         public let metrics: LayoutMetrics
-        public let deviceMetrics: DeviceMetrics
         public let isVisible: Bool
         public let theme: PresentationTheme
         public let strings: PresentationStrings
@@ -37,9 +80,7 @@ open class ViewControllerComponentContainer: ViewController {
             statusBarHeight: CGFloat,
             navigationHeight: CGFloat,
             safeInsets: UIEdgeInsets,
-            inputHeight: CGFloat,
             metrics: LayoutMetrics,
-            deviceMetrics: DeviceMetrics,
             isVisible: Bool,
             theme: PresentationTheme,
             strings: PresentationStrings,
@@ -49,9 +90,7 @@ open class ViewControllerComponentContainer: ViewController {
             self.statusBarHeight = statusBarHeight
             self.navigationHeight = navigationHeight
             self.safeInsets = safeInsets
-            self.inputHeight = inputHeight
             self.metrics = metrics
-            self.deviceMetrics = deviceMetrics
             self.isVisible = isVisible
             self.theme = theme
             self.strings = strings
@@ -73,13 +112,7 @@ open class ViewControllerComponentContainer: ViewController {
             if lhs.safeInsets != rhs.safeInsets {
                 return false
             }
-            if lhs.inputHeight != rhs.inputHeight {
-                return false
-            }
             if lhs.metrics != rhs.metrics {
-                return false
-            }
-            if lhs.deviceMetrics != rhs.deviceMetrics {
                 return false
             }
             if lhs.isVisible != rhs.isVisible {
@@ -137,9 +170,7 @@ open class ViewControllerComponentContainer: ViewController {
                 statusBarHeight: layout.statusBarHeight ?? 0.0,
                 navigationHeight: navigationHeight,
                 safeInsets: UIEdgeInsets(top: layout.intrinsicInsets.top + layout.safeInsets.top, left: layout.safeInsets.left, bottom: layout.intrinsicInsets.bottom + layout.safeInsets.bottom, right: layout.safeInsets.right),
-                inputHeight: layout.inputHeight ?? 0.0,
                 metrics: layout.metrics,
-                deviceMetrics: layout.deviceMetrics,
                 isVisible: self.currentIsVisible,
                 theme: self.theme ?? self.presentationData.theme,
                 strings: self.presentationData.strings,
@@ -190,7 +221,7 @@ open class ViewControllerComponentContainer: ViewController {
     private let component: AnyComponent<ViewControllerComponentContainer.Environment>
     
     private var presentationDataDisposable: Disposable?
-    public private(set) var validLayout: ContainerViewLayout?
+    private var validLayout: ContainerViewLayout?
     
     public init<C: Component>(context: AccountContext, component: C, navigationBarAppearance: NavigationBarAppearance, statusBarStyle: StatusBarStyle = .default, theme: PresentationTheme? = nil) where C.EnvironmentType == ViewControllerComponentContainer.Environment {
         self.context = context

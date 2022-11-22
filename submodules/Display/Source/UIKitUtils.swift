@@ -387,7 +387,7 @@ public func assertNotOnMainThread(_ file: String = #file, line: Int = #line) {
 }
 
 public extension UIImage {
-    func precomposed() -> UIImage {        
+    func precomposed() -> UIImage {
         UIGraphicsBeginImageContextWithOptions(self.size, false, self.scale)
         self.draw(at: CGPoint())
         let result = UIGraphicsGetImageFromCurrentImageContext()!
@@ -412,7 +412,6 @@ private func makeSubtreeSnapshot(layer: CALayer, keepTransform: Bool = false) ->
     view.layer.contentsCenter = layer.contentsCenter
     view.layer.contentsGravity = layer.contentsGravity
     view.layer.masksToBounds = layer.masksToBounds
-    view.layer.layerTintColor = layer.layerTintColor
     if let mask = layer.mask {
         if let shapeMask = mask as? CAShapeLayer {
             let maskLayer = CAShapeLayer()
@@ -425,11 +424,8 @@ private func makeSubtreeSnapshot(layer: CALayer, keepTransform: Bool = false) ->
             maskLayer.contentsScale = mask.contentsScale
             maskLayer.contentsCenter = mask.contentsCenter
             maskLayer.contentsGravity = mask.contentsGravity
-            maskLayer.transform = mask.transform
-            maskLayer.position = mask.position
+            maskLayer.frame = mask.frame
             maskLayer.bounds = mask.bounds
-            maskLayer.anchorPoint = mask.anchorPoint
-            maskLayer.layerTintColor = mask.layerTintColor
             view.layer.mask = maskLayer
         }
     }
@@ -442,17 +438,10 @@ private func makeSubtreeSnapshot(layer: CALayer, keepTransform: Bool = false) ->
                 if keepTransform {
                     subtree.layer.transform = sublayer.transform
                 }
-                subtree.layer.transform = sublayer.transform
-                subtree.layer.position = sublayer.position
-                subtree.layer.bounds = sublayer.bounds
-                subtree.layer.anchorPoint = sublayer.anchorPoint
-                subtree.layer.layerTintColor = sublayer.layerTintColor
+                subtree.frame = sublayer.frame
+                subtree.bounds = sublayer.bounds
                 if let maskLayer = subtree.layer.mask {
-                    maskLayer.transform = sublayer.transform
-                    maskLayer.position = sublayer.position
-                    maskLayer.bounds = sublayer.bounds
-                    maskLayer.anchorPoint = sublayer.anchorPoint
-                    maskLayer.layerTintColor = sublayer.layerTintColor
+                    maskLayer.frame = sublayer.bounds
                 }
                 view.addSubview(subtree)
             } else {
@@ -478,16 +467,14 @@ private func makeLayerSubtreeSnapshot(layer: CALayer) -> CALayer? {
     view.masksToBounds = layer.masksToBounds
     view.cornerRadius = layer.cornerRadius
     view.backgroundColor = layer.backgroundColor
-    view.layerTintColor = layer.layerTintColor
     if let sublayers = layer.sublayers {
         for sublayer in sublayers {
             let subtree = makeLayerSubtreeSnapshot(layer: sublayer)
             if let subtree = subtree {
                 subtree.transform = sublayer.transform
-                subtree.position = sublayer.position
+                subtree.frame = sublayer.frame
                 subtree.bounds = sublayer.bounds
-                subtree.anchorPoint = sublayer.anchorPoint
-                view.addSublayer(subtree)
+                layer.addSublayer(subtree)
             } else {
                 return nil
             }
@@ -495,41 +482,6 @@ private func makeLayerSubtreeSnapshot(layer: CALayer) -> CALayer? {
     }
     return view
 }
-
-private func makeLayerSubtreeSnapshotAsView(layer: CALayer) -> UIView? {
-    if layer is AVSampleBufferDisplayLayer {
-        return nil
-    }
-    let view = UIView()
-    view.layer.isHidden = layer.isHidden
-    view.layer.opacity = layer.opacity
-    view.layer.contents = layer.contents
-    view.layer.contentsRect = layer.contentsRect
-    view.layer.contentsScale = layer.contentsScale
-    view.layer.contentsCenter = layer.contentsCenter
-    view.layer.contentsGravity = layer.contentsGravity
-    view.layer.masksToBounds = layer.masksToBounds
-    view.layer.cornerRadius = layer.cornerRadius
-    view.layer.backgroundColor = layer.backgroundColor
-    view.layer.layerTintColor = layer.layerTintColor
-    if let sublayers = layer.sublayers {
-        for sublayer in sublayers {
-            let subtree = makeLayerSubtreeSnapshotAsView(layer: sublayer)
-            if let subtree = subtree {
-                subtree.layer.transform = sublayer.transform
-                subtree.layer.position = sublayer.position
-                subtree.layer.bounds = sublayer.bounds
-                subtree.layer.anchorPoint = sublayer.anchorPoint
-                subtree.layer.layerTintColor = sublayer.layerTintColor
-                view.addSubview(subtree)
-            } else {
-                return nil
-            }
-        }
-    }
-    return view
-}
-
 
 public extension UIView {
     func snapshotContentTree(unhide: Bool = false, keepTransform: Bool = false) -> UIView? {
@@ -538,27 +490,6 @@ public extension UIView {
             self.isHidden = false
         }
         let snapshot = makeSubtreeSnapshot(layer: self.layer, keepTransform: keepTransform)
-        if unhide && wasHidden {
-            self.isHidden = true
-        }
-        if let snapshot = snapshot {
-            snapshot.layer.position = self.layer.position
-            snapshot.layer.bounds = self.layer.bounds
-            snapshot.layer.anchorPoint = self.layer.anchorPoint
-            return snapshot
-        }
-        
-        return nil
-    }
-}
-
-public extension CALayer {
-    func snapshotContentTree(unhide: Bool = false) -> CALayer? {
-        let wasHidden = self.isHidden
-        if unhide && wasHidden {
-            self.isHidden = false
-        }
-        let snapshot = makeLayerSubtreeSnapshot(layer: self)
         if unhide && wasHidden {
             self.isHidden = true
         }
@@ -573,27 +504,12 @@ public extension CALayer {
 }
 
 public extension CALayer {
-    var layerTintColor: CGColor? {
-        get {
-            if let value = self.value(forKey: "contentsMultiplyColor"), CFGetTypeID(value as CFTypeRef) == CGColor.typeID {
-                let result = value as! CGColor
-                return result
-            } else {
-                return nil
-            }
-        } set(value) {
-            self.setValue(value, forKey: "contentsMultiplyColor")
-        }
-    }
-}
-
-public extension CALayer {
-    func snapshotContentTreeAsView(unhide: Bool = false) -> UIView? {
+    func snapshotContentTree(unhide: Bool = false) -> CALayer? {
         let wasHidden = self.isHidden
         if unhide && wasHidden {
             self.isHidden = false
         }
-        let snapshot = makeLayerSubtreeSnapshotAsView(layer: self)
+        let snapshot = makeLayerSubtreeSnapshot(layer: self)
         if unhide && wasHidden {
             self.isHidden = true
         }
@@ -622,6 +538,10 @@ public extension CGRect {
     
     var bottomRight: CGPoint {
         return CGPoint(x: self.maxX, y: self.maxY)
+    }
+    
+    var center: CGPoint {
+        return CGPoint(x: self.midX, y: self.midY)
     }
 }
 

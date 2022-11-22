@@ -98,15 +98,15 @@ private final class TranslateScreenComponent: CombinedComponent {
             self.availableSpeakLanguages = supportedSpeakLanguages()
             
             super.init()
-                        
-            self.translationDisposable.set((context.engine.messages.translate(text: text, fromLang: fromLanguage, toLang: toLanguage) |> deliverOnMainQueue).start(next: { [weak self] text in
+            
+            self.translationDisposable.set((translateText(context: context, text: text, from: fromLanguage, to: toLanguage) |> deliverOnMainQueue).start(next: { [weak self] result in
                 guard let strongSelf = self else {
                     return
                 }
-                strongSelf.translatedText = text
-//                if strongSelf.fromLanguage == nil {
-//                    strongSelf.fromLanguage = result.detectedLanguage
-//                }
+                strongSelf.translatedText = result.text
+                if strongSelf.fromLanguage == nil {
+                    strongSelf.fromLanguage = result.detectedLanguage
+                }
                 strongSelf.updated(transition: .immediate)
             }, error: { error in
                 
@@ -127,14 +127,14 @@ private final class TranslateScreenComponent: CombinedComponent {
             self.translatedText = nil
             self.updated(transition: .immediate)
             
-            self.translationDisposable.set((self.context.engine.messages.translate(text: text, fromLang: fromLanguage, toLang: toLanguage) |> deliverOnMainQueue).start(next: { [weak self] text in
+            self.translationDisposable.set((translateText(context: self.context, text: text, from: fromLanguage, to: toLanguage) |> deliverOnMainQueue).start(next: { [weak self] result in
                 guard let strongSelf = self else {
                     return
                 }
-                strongSelf.translatedText = text
-//                if strongSelf.fromLanguage == nil {
-//                    strongSelf.fromLanguage = result.detectedLanguage
-//                }
+                strongSelf.translatedText = result.text
+                if strongSelf.fromLanguage == nil {
+                    strongSelf.fromLanguage = result.detectedLanguage
+                }
                 strongSelf.updated(transition: .immediate)
             }, error: { error in
                 
@@ -720,9 +720,7 @@ public class TranslateScreen: ViewController {
                 statusBarHeight: 0.0,
                 navigationHeight: navigationHeight,
                 safeInsets: UIEdgeInsets(top: layout.intrinsicInsets.top + layout.safeInsets.top, left: layout.safeInsets.left, bottom: layout.intrinsicInsets.bottom + layout.safeInsets.bottom, right: layout.safeInsets.right),
-                inputHeight: layout.inputHeight ?? 0.0,
                 metrics: layout.metrics,
-                deviceMetrics: layout.deviceMetrics,
                 isVisible: self.currentIsVisible,
                 theme: self.theme ?? self.presentationData.theme,
                 strings: self.presentationData.strings,

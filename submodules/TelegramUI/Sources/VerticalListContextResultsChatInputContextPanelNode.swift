@@ -133,7 +133,7 @@ final class VerticalListContextResultsChatInputContextPanelNode: ChatInputContex
     private let loadMoreDisposable = MetaDisposable()
     private var isLoadingMore: Bool = false
     
-    override init(context: AccountContext, theme: PresentationTheme, strings: PresentationStrings, fontSize: PresentationFontSize, chatPresentationContext: ChatPresentationContext) {
+    override init(context: AccountContext, theme: PresentationTheme, strings: PresentationStrings, fontSize: PresentationFontSize) {
         self.listView = ListView()
         self.listView.isOpaque = false
         self.listView.stackFromBottom = true
@@ -145,7 +145,7 @@ final class VerticalListContextResultsChatInputContextPanelNode: ChatInputContex
             return strings.VoiceOver_ScrollStatus(row, count).string
         }
         
-        super.init(context: context, theme: theme, strings: strings, fontSize: fontSize, chatPresentationContext: chatPresentationContext)
+        super.init(context: context, theme: theme, strings: strings, fontSize: fontSize)
         
         self.isOpaque = false
         self.clipsToBounds = true

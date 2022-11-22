@@ -88,8 +88,7 @@ func paneGifSearchForQuery(context: AccountContext, query: String, offset: Strin
                                     dimensions: dimensions,
                                     resource: thumbnailResource,
                                     progressiveSizes: [],
-                                    immediateThumbnailData: nil,
-                                    hasVideo: false
+                                    immediateThumbnailData: nil
                                 ))
                             }
                         }
@@ -332,9 +331,9 @@ final class GifPaneSearchContentNode: ASDisplayNode & PaneSearchContentNode {
             
             multiplexedNode.fileSelected = { [weak self] file, sourceNode, sourceRect in
                 if let (collection, result) = file.contextResult {
-                    let _ = self?.controllerInteraction.sendBotContextResultAsGif(collection, result, sourceNode.view, sourceRect, false)
+                    let _ = self?.controllerInteraction.sendBotContextResultAsGif(collection, result, sourceNode, sourceRect, false)
                 } else {
-                    let _ = self?.controllerInteraction.sendGif(file.file, sourceNode.view, sourceRect, false, false)
+                    let _ = self?.controllerInteraction.sendGif(file.file, sourceNode, sourceRect, false, false)
                 }
             }
             

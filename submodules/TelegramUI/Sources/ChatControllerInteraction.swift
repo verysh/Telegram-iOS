@@ -4,7 +4,6 @@ import Postbox
 import SwiftSignalKit
 import AsyncDisplayKit
 import TelegramCore
-import Postbox
 import Display
 import TelegramUIPreferences
 import AccountContext
@@ -14,7 +13,6 @@ import ChatInterfaceState
 import UndoUI
 import TelegramPresentationData
 import ChatPresentationInterfaceState
-import TextFormat
 
 struct ChatInterfaceHighlightedState: Equatable {
     let messageStableId: UInt32
@@ -51,7 +49,7 @@ public enum ChatControllerInteractionSwipeAction {
 
 public enum ChatControllerInteractionReaction {
     case `default`
-    case reaction(MessageReaction.Reaction)
+    case reaction(String)
 }
 
 struct UnreadMessageRangeKey: Hashable {
@@ -61,11 +59,11 @@ struct UnreadMessageRangeKey: Hashable {
 
 public final class ChatControllerInteraction {
     let openMessage: (Message, ChatControllerInteractionOpenMessageMode) -> Bool
-    let openPeer: (EnginePeer, ChatControllerInteractionNavigateToPeer, MessageReference?, Bool) -> Void
+    let openPeer: (PeerId?, ChatControllerInteractionNavigateToPeer, MessageReference?, Peer?) -> Void
     let openPeerMention: (String) -> Void
-    let openMessageContextMenu: (Message, Bool, ASDisplayNode, CGRect, UIGestureRecognizer?, CGPoint?) -> Void
+    let openMessageContextMenu: (Message, Bool, ASDisplayNode, CGRect, UIGestureRecognizer?) -> Void
     let updateMessageReaction: (Message, ChatControllerInteractionReaction) -> Void
-    let openMessageReactionContextMenu: (Message, ContextExtractedContentContainingView, ContextGesture?, MessageReaction.Reaction) -> Void
+    let openMessageReactionContextMenu: (Message, ContextExtractedContentContainingView, ContextGesture?, String) -> Void
     let activateMessagePinch: (PinchSourceContainerNode) -> Void
     let openMessageContextActions: (Message, ASDisplayNode, CGRect, ContextGesture?) -> Void
     let navigateToMessage: (MessageId, MessageId) -> Void
@@ -75,10 +73,9 @@ public final class ChatControllerInteraction {
     let toggleMessagesSelection: ([MessageId], Bool) -> Void
     let sendCurrentMessage: (Bool) -> Void
     let sendMessage: (String) -> Void
-    let sendSticker: (FileMediaReference, Bool, Bool, String?, Bool, UIView, CGRect, CALayer?, [ItemCollectionId]) -> Bool
-    let sendEmoji: (String, ChatTextInputTextCustomEmojiAttribute) -> Void
-    let sendGif: (FileMediaReference, UIView, CGRect, Bool, Bool) -> Bool
-    let sendBotContextResultAsGif: (ChatContextResultCollection, ChatContextResult, UIView, CGRect, Bool) -> Bool
+    let sendSticker: (FileMediaReference, Bool, Bool, String?, Bool, ASDisplayNode, CGRect) -> Bool
+    let sendGif: (FileMediaReference, ASDisplayNode, CGRect, Bool, Bool) -> Bool
+    let sendBotContextResultAsGif: (ChatContextResultCollection, ChatContextResult, ASDisplayNode, CGRect, Bool) -> Bool
     let requestMessageActionCallback: (MessageId, MemoryBuffer?, Bool, Bool) -> Void
     let requestMessageActionUrlAuth: (String, MessageActionUrlSubject) -> Void
     let activateSwitchInline: (PeerId?, String) -> Void
@@ -125,7 +122,7 @@ public final class ChatControllerInteraction {
     let displayPollSolution: (TelegramMediaPollResults.Solution, ASDisplayNode) -> Void
     let displayPsa: (String, ASDisplayNode) -> Void
     let displayDiceTooltip: (TelegramMediaDice) -> Void
-    let animateDiceSuccess: (Bool, Bool) -> Void
+    let animateDiceSuccess: (Bool) -> Void
     let displayPremiumStickerTooltip: (TelegramMediaFile, Message) -> Void
     let openPeerContextMenu: (Peer, MessageId?, ASDisplayNode, CGRect, ContextGesture?) -> Void
     let openMessageReplies: (MessageId, Bool, Bool) -> Void
@@ -141,12 +138,9 @@ public final class ChatControllerInteraction {
     let openLargeEmojiInfo: (String, String?, TelegramMediaFile) -> Void
     let openJoinLink: (String) -> Void
     let openWebView: (String, String, Bool, Bool) -> Void
-    let activateAdAction: (EngineMessage.Id) -> Void
     
-    let requestMessageUpdate: (MessageId, Bool) -> Void
+    let requestMessageUpdate: (MessageId) -> Void
     let cancelInteractiveKeyboardGestures: () -> Void
-    let dismissTextInput: () -> Void
-    let scrollToMessageId: (MessageIndex) -> Void
     
     var canPlayMedia: Bool = false
     var hiddenMedia: [MessageId: [Media]] = [:]
@@ -165,14 +159,13 @@ public final class ChatControllerInteraction {
     var currentMessageWithLoadingReplyThread: MessageId?
     var updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)?
     let presentationContext: ChatPresentationContext
-    var playNextOutgoingGift: Bool = false
     
     init(
         openMessage: @escaping (Message, ChatControllerInteractionOpenMessageMode) -> Bool,
-        openPeer: @escaping (EnginePeer, ChatControllerInteractionNavigateToPeer, MessageReference?, Bool) -> Void,
+        openPeer: @escaping (PeerId?, ChatControllerInteractionNavigateToPeer, MessageReference?, Peer?) -> Void,
         openPeerMention: @escaping (String) -> Void,
-        openMessageContextMenu: @escaping (Message, Bool, ASDisplayNode, CGRect, UIGestureRecognizer?, CGPoint?) -> Void,
-        openMessageReactionContextMenu: @escaping (Message, ContextExtractedContentContainingView, ContextGesture?, MessageReaction.Reaction) -> Void,
+        openMessageContextMenu: @escaping (Message, Bool, ASDisplayNode, CGRect, UIGestureRecognizer?) -> Void,
+        openMessageReactionContextMenu: @escaping (Message, ContextExtractedContentContainingView, ContextGesture?, String) -> Void,
         updateMessageReaction: @escaping (Message, ChatControllerInteractionReaction) -> Void,
         activateMessagePinch: @escaping (PinchSourceContainerNode) -> Void,
         openMessageContextActions: @escaping (Message, ASDisplayNode, CGRect, ContextGesture?) -> Void,
@@ -183,10 +176,9 @@ public final class ChatControllerInteraction {
         toggleMessagesSelection: @escaping ([MessageId], Bool) -> Void,
         sendCurrentMessage: @escaping (Bool) -> Void,
         sendMessage: @escaping (String) -> Void,
-        sendSticker: @escaping (FileMediaReference, Bool, Bool, String?, Bool, UIView, CGRect, CALayer?, [ItemCollectionId]) -> Bool,
-        sendEmoji: @escaping (String, ChatTextInputTextCustomEmojiAttribute) -> Void,
-        sendGif: @escaping (FileMediaReference, UIView, CGRect, Bool, Bool) -> Bool,
-        sendBotContextResultAsGif: @escaping (ChatContextResultCollection, ChatContextResult, UIView, CGRect, Bool) -> Bool,
+        sendSticker: @escaping (FileMediaReference, Bool, Bool, String?, Bool, ASDisplayNode, CGRect) -> Bool,
+        sendGif: @escaping (FileMediaReference, ASDisplayNode, CGRect, Bool, Bool) -> Bool,
+        sendBotContextResultAsGif: @escaping (ChatContextResultCollection, ChatContextResult, ASDisplayNode, CGRect, Bool) -> Bool,
         requestMessageActionCallback: @escaping (MessageId, MemoryBuffer?, Bool, Bool) -> Void,
         requestMessageActionUrlAuth: @escaping (String, MessageActionUrlSubject) -> Void,
         activateSwitchInline: @escaping (PeerId?, String) -> Void,
@@ -233,7 +225,7 @@ public final class ChatControllerInteraction {
         displayPollSolution: @escaping (TelegramMediaPollResults.Solution, ASDisplayNode) -> Void,
         displayPsa: @escaping (String, ASDisplayNode) -> Void,
         displayDiceTooltip: @escaping (TelegramMediaDice) -> Void,
-        animateDiceSuccess: @escaping (Bool, Bool) -> Void,
+        animateDiceSuccess: @escaping (Bool) -> Void,
         displayPremiumStickerTooltip: @escaping (TelegramMediaFile, Message) -> Void,
         openPeerContextMenu: @escaping (Peer, MessageId?, ASDisplayNode, CGRect, ContextGesture?) -> Void,
         openMessageReplies: @escaping (MessageId, Bool, Bool) -> Void,
@@ -249,11 +241,8 @@ public final class ChatControllerInteraction {
         openLargeEmojiInfo: @escaping (String, String?, TelegramMediaFile) -> Void,
         openJoinLink: @escaping (String) -> Void,
         openWebView: @escaping (String, String, Bool, Bool) -> Void,
-        activateAdAction: @escaping (EngineMessage.Id) -> Void,
-        requestMessageUpdate: @escaping (MessageId, Bool) -> Void,
+        requestMessageUpdate: @escaping (MessageId) -> Void,
         cancelInteractiveKeyboardGestures: @escaping () -> Void,
-        dismissTextInput: @escaping () -> Void,
-        scrollToMessageId: @escaping (MessageIndex) -> Void,
         automaticMediaDownloadSettings: MediaAutoDownloadSettings,
         pollActionState: ChatInterfacePollActionState,
         stickerSettings: ChatInterfaceStickerSettings,
@@ -275,7 +264,6 @@ public final class ChatControllerInteraction {
         self.sendCurrentMessage = sendCurrentMessage
         self.sendMessage = sendMessage
         self.sendSticker = sendSticker
-        self.sendEmoji = sendEmoji
         self.sendGif = sendGif
         self.sendBotContextResultAsGif = sendBotContextResultAsGif
         self.requestMessageActionCallback = requestMessageActionCallback
@@ -340,11 +328,8 @@ public final class ChatControllerInteraction {
         self.openLargeEmojiInfo = openLargeEmojiInfo
         self.openJoinLink = openJoinLink
         self.openWebView = openWebView
-        self.activateAdAction = activateAdAction
         self.requestMessageUpdate = requestMessageUpdate
         self.cancelInteractiveKeyboardGestures = cancelInteractiveKeyboardGestures
-        self.dismissTextInput = dismissTextInput
-        self.scrollToMessageId = scrollToMessageId
         
         self.automaticMediaDownloadSettings = automaticMediaDownloadSettings
         

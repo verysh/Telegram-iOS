@@ -19,8 +19,6 @@ import PresentationDataUtils
 import MeshAnimationCache
 import FetchManagerImpl
 import InAppPurchaseManager
-import AnimationCache
-import MultiAnimationRenderer
 
 private final class DeviceSpecificContactImportContext {
     let disposable = MetaDisposable()
@@ -162,9 +160,6 @@ public final class AccountContextImpl: AccountContext {
     public let cachedGroupCallContexts: AccountGroupCallContextCache
     public let meshAnimationCache: MeshAnimationCache
     
-    public let animationCache: AnimationCache
-    public let animationRenderer: MultiAnimationRenderer
-    
     private var animatedEmojiStickersDisposable: Disposable?
     public private(set) var animatedEmojiStickers: [String: [StickerPackItem]] = [:]
     
@@ -191,8 +186,11 @@ public final class AccountContextImpl: AccountContext {
             self.prefetchManager = PrefetchManagerImpl(sharedContext: sharedContext, account: account, engine: self.engine, fetchManager: self.fetchManager)
             self.wallpaperUploadManager = WallpaperUploadManagerImpl(sharedContext: sharedContext, account: account, presentationData: sharedContext.presentationData)
             self.themeUpdateManager = ThemeUpdateManagerImpl(sharedContext: sharedContext, account: account)
-            
-            self.inAppPurchaseManager = InAppPurchaseManager(engine: self.engine)
+            if let premiumProductId = sharedContext.premiumProductId {
+                self.inAppPurchaseManager = InAppPurchaseManager(engine: self.engine, premiumProductId: premiumProductId)
+            } else {
+                self.inAppPurchaseManager = nil
+            }
         } else {
             self.prefetchManager = nil
             self.wallpaperUploadManager = nil
@@ -208,11 +206,6 @@ public final class AccountContextImpl: AccountContext {
         
         self.cachedGroupCallContexts = AccountGroupCallContextCacheImpl()
         self.meshAnimationCache = MeshAnimationCache(mediaBox: account.postbox.mediaBox)
-        
-        self.animationCache = AnimationCacheImpl(basePath: self.account.postbox.mediaBox.basePath + "/animation-cache", allocateTempFile: {
-            return TempBox.shared.tempFile(fileName: "file").path
-        })
-        self.animationRenderer = MultiAnimationRendererImpl()
         
         let updatedLimitsConfiguration = account.postbox.preferencesView(keys: [PreferencesKeys.limitsConfiguration])
         |> map { preferences -> LimitsConfiguration in
@@ -342,14 +335,10 @@ public final class AccountContextImpl: AccountContext {
     public func chatLocationInput(for location: ChatLocation, contextHolder: Atomic<ChatLocationContextHolder?>) -> ChatLocationInput {
         switch location {
         case let .peer(peerId):
-            return .peer(peerId: peerId, threadId: nil)
+            return .peer(peerId: peerId)
         case let .replyThread(data):
-            if data.isForumPost {
-                return .peer(peerId: data.messageId.peerId, threadId: Int64(data.messageId.id))
-            } else {
-                let context = chatLocationContext(holder: contextHolder, account: self.account, data: data)
-                return .thread(peerId: data.messageId.peerId, threadId: makeMessageThreadId(data.messageId), data: context.state)
-            }
+            let context = chatLocationContext(holder: contextHolder, account: self.account, data: data)
+            return .thread(peerId: data.messageId.peerId, threadId: makeMessageThreadId(data.messageId), data: context.state)
         case let .feed(id):
             let context = chatLocationContext(holder: contextHolder, account: self.account, feedId: id)
             return .feed(id: id, data: context.state)
@@ -361,20 +350,8 @@ public final class AccountContextImpl: AccountContext {
         case .peer:
             return .single(nil)
         case let .replyThread(data):
-            if data.isForumPost, let peerId = location.peerId {
-                let viewKey: PostboxViewKey = .messageHistoryThreadInfo(peerId: data.messageId.peerId, threadId: Int64(data.messageId.id))
-                return self.account.postbox.combinedView(keys: [viewKey])
-                |> map { views -> MessageId? in
-                    if let threadInfo = views.views[viewKey] as? MessageHistoryThreadInfoView, let data = threadInfo.info?.data.get(MessageHistoryThreadData.self) {
-                        return MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: data.maxOutgoingReadId)
-                    } else {
-                        return nil
-                    }
-                }
-            } else {
-                let context = chatLocationContext(holder: contextHolder, account: self.account, data: data)
-                return context.maxReadOutgoingMessageId
-            }
+            let context = chatLocationContext(holder: contextHolder, account: self.account, data: data)
+            return context.maxReadOutgoingMessageId
         case let .feed(id):
             let context = chatLocationContext(holder: contextHolder, account: self.account, feedId: id)
             return context.maxReadOutgoingMessageId
@@ -384,34 +361,22 @@ public final class AccountContextImpl: AccountContext {
     public func chatLocationUnreadCount(for location: ChatLocation, contextHolder: Atomic<ChatLocationContextHolder?>) -> Signal<Int, NoError> {
         switch location {
         case let .peer(peerId):
-            let unreadCountsKey: PostboxViewKey = .unreadCounts(items: [.peer(id: peerId, handleThreads: false), .total(nil)])
+            let unreadCountsKey: PostboxViewKey = .unreadCounts(items: [.peer(peerId), .total(nil)])
             return self.account.postbox.combinedView(keys: [unreadCountsKey])
             |> map { views in
                 var unreadCount: Int32 = 0
-                
+
                 if let view = views.views[unreadCountsKey] as? UnreadMessageCountsView {
-                    if let count = view.count(for: .peer(id: peerId, handleThreads: false)) {
+                    if let count = view.count(for: .peer(peerId)) {
                         unreadCount = count
                     }
                 }
-                
+
                 return Int(unreadCount)
             }
         case let .replyThread(data):
-            if data.isForumPost {
-                let viewKey: PostboxViewKey = .messageHistoryThreadInfo(peerId: data.messageId.peerId, threadId: Int64(data.messageId.id))
-                return self.account.postbox.combinedView(keys: [viewKey])
-                |> map { views -> Int in
-                    if let threadInfo = views.views[viewKey] as? MessageHistoryThreadInfoView, let data = threadInfo.info?.data.get(MessageHistoryThreadData.self) {
-                        return Int(data.incomingUnreadCount)
-                    } else {
-                        return 0
-                    }
-                }
-            } else {
-                let context = chatLocationContext(holder: contextHolder, account: self.account, data: data)
-                return context.unreadCount
-            }
+            let context = chatLocationContext(holder: contextHolder, account: self.account, data: data)
+            return context.unreadCount
         case let .feed(id):
             let context = chatLocationContext(holder: contextHolder, account: self.account, feedId: id)
             return context.unreadCount

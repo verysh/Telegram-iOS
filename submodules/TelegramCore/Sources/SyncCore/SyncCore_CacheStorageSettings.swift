@@ -5,7 +5,7 @@ public struct CacheStorageSettings: Codable, Equatable {
     public let defaultCacheStorageLimitGigabytes: Int32
 
     public static var defaultSettings: CacheStorageSettings {
-        return CacheStorageSettings(defaultCacheStorageTimeout: Int32.max, defaultCacheStorageLimitGigabytes: 8 * 1024 * 1024)
+        return CacheStorageSettings(defaultCacheStorageTimeout: Int32.max, defaultCacheStorageLimitGigabytes: Int32.max)
     }
     
     public init(defaultCacheStorageTimeout: Int32, defaultCacheStorageLimitGigabytes: Int32) {
@@ -17,14 +17,7 @@ public struct CacheStorageSettings: Codable, Equatable {
         let container = try decoder.container(keyedBy: StringCodingKey.self)
 
         self.defaultCacheStorageTimeout = (try? container.decode(Int32.self, forKey: "dt")) ?? Int32.max
-        
-        if let legacyValue = try container.decodeIfPresent(Int32.self, forKey: "dl") {
-            self.defaultCacheStorageLimitGigabytes = legacyValue
-        } else if let value = try container.decodeIfPresent(Int32.self, forKey: "sizeLimit") {
-            self.defaultCacheStorageLimitGigabytes = value
-        } else {
-            self.defaultCacheStorageLimitGigabytes = 8 * 1024 * 1024
-        }
+        self.defaultCacheStorageLimitGigabytes = (try? container.decode(Int32.self, forKey: "dl")) ?? Int32.max
     }
     
     public func encode(to encoder: Encoder) throws {

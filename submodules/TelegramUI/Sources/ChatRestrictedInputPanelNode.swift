@@ -7,11 +7,9 @@ import Postbox
 import SwiftSignalKit
 import TelegramStringFormatting
 import ChatPresentationInterfaceState
-import TelegramPresentationData
 
 final class ChatRestrictedInputPanelNode: ChatInputPanelNode {
     private let textNode: ImmediateTextNode
-    private var iconView: UIImageView?
     
     private var presentationInterfaceState: ChatPresentationInterfaceState?
     
@@ -25,7 +23,7 @@ final class ChatRestrictedInputPanelNode: ChatInputPanelNode {
         self.addSubnode(self.textNode)
     }
     
-    override func updateLayout(width: CGFloat, leftInset: CGFloat, rightInset: CGFloat, bottomInset: CGFloat, additionalSideInsets: UIEdgeInsets, maxHeight: CGFloat, isSecondary: Bool, transition: ContainedViewLayoutTransition, interfaceState: ChatPresentationInterfaceState, metrics: LayoutMetrics, isMediaInputExpanded: Bool) -> CGFloat {
+    override func updateLayout(width: CGFloat, leftInset: CGFloat, rightInset: CGFloat, bottomInset: CGFloat, additionalSideInsets: UIEdgeInsets, maxHeight: CGFloat, isSecondary: Bool, transition: ContainedViewLayoutTransition, interfaceState: ChatPresentationInterfaceState, metrics: LayoutMetrics) -> CGFloat {
         if self.presentationInterfaceState != interfaceState {
             self.presentationInterfaceState = interfaceState
         }
@@ -43,14 +41,7 @@ final class ChatRestrictedInputPanelNode: ChatInputPanelNode {
             bannedPermission = nil
         }
         
-        var iconImage: UIImage?
-        
-        if let threadData = interfaceState.threadData, threadData.isClosed {
-            iconImage = PresentationResourcesChat.chatPanelLockIcon(interfaceState.theme)
-            self.textNode.attributedText = NSAttributedString(string: interfaceState.strings.Chat_PanelTopicClosedText, font: Font.regular(15.0), textColor: interfaceState.theme.chat.inputPanel.secondaryTextColor)
-        } else if let channel = interfaceState.renderedPeer?.peer as? TelegramChannel, channel.flags.contains(.isForum), case .peer = interfaceState.chatLocation {
-            self.textNode.attributedText = NSAttributedString(string: interfaceState.strings.Chat_PanelForumModeReplyText, font: Font.regular(15.0), textColor: interfaceState.theme.chat.inputPanel.secondaryTextColor)
-        } else if let (untilDate, personal) = bannedPermission {
+        if let (untilDate, personal) = bannedPermission {
             if personal && untilDate != 0 && untilDate != Int32.max {
                 self.textNode.attributedText = NSAttributedString(string: interfaceState.strings.Conversation_RestrictedTextTimed(stringForFullDate(timestamp: untilDate, strings: interfaceState.strings, dateTimeFormat: interfaceState.dateTimeFormat)).string, font: Font.regular(13.0), textColor: interfaceState.theme.chat.inputPanel.secondaryTextColor)
             } else if personal {
@@ -63,24 +54,7 @@ final class ChatRestrictedInputPanelNode: ChatInputPanelNode {
         let panelHeight = defaultHeight(metrics: metrics)
         let textSize = self.textNode.updateLayout(CGSize(width: width - leftInset - rightInset - 8.0 * 2.0, height: panelHeight))
         
-        let textFrame = CGRect(origin: CGPoint(x: leftInset + floor((width - leftInset - rightInset - textSize.width) / 2.0), y: floor((panelHeight - textSize.height) / 2.0)), size: textSize)
-        self.textNode.frame = textFrame
-        
-        if let iconImage = iconImage {
-            let iconView: UIImageView
-            if let current = self.iconView {
-                iconView = current
-            } else {
-                iconView = UIImageView()
-                self.iconView = iconView
-                self.view.addSubview(iconView)
-            }
-            iconView.image = iconImage
-            iconView.frame = CGRect(origin: CGPoint(x: textFrame.minX - 4.0 - iconImage.size.width, y: textFrame.minY + UIScreenPixel + floorToScreenPixels((textFrame.height - iconImage.size.height) / 2.0)), size: iconImage.size)
-        } else if let iconView = self.iconView {
-            self.iconView = nil
-            iconView.removeFromSuperview()
-        }
+        self.textNode.frame = CGRect(origin: CGPoint(x: leftInset + floor((width - leftInset - rightInset - textSize.width) / 2.0), y: floor((panelHeight - textSize.height) / 2.0)), size: textSize)
         
         return panelHeight
     }

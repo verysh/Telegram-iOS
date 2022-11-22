@@ -171,11 +171,9 @@ static const NSUInteger MTMaxUnacknowledgedMessageCount = 64;
         
         _sessionInfo = [[MTSessionInfo alloc] initWithRandomSessionIdAndContext:_context];
         
+        
+        
         _shouldStayConnected = true;
-        
-        _mtState |= MTProtoStatePaused;
-        
-        [self setMtState:_mtState | MTProtoStatePaused];
     }
     return self;
 }
@@ -2575,11 +2573,9 @@ static bool isDataEqualToDataConstTime(NSData *data1, NSData *data2) {
                 resolvedShouldReset = true;
             }
             
-            if ((_mtState & MTProtoStateAwaitingDatacenterAuthorization) == 0 && (_mtState & MTProtoStatePaused) == 0) {
-                if (resolvedShouldReset) {
-                    [self resetTransport];
-                    [self requestTransportTransaction];
-                }
+            if (resolvedShouldReset) {
+                [self resetTransport];
+                [self requestTransportTransaction];
             }
         }
     }];

@@ -18,7 +18,6 @@ enum SelectivePrivacySettingsKind {
     case profilePhoto
     case forwards
     case phoneNumber
-    case voiceMessages
 }
 
 private enum SelectivePrivacySettingType {
@@ -581,11 +580,6 @@ private func selectivePrivacySettingsControllerEntries(presentationData: Present
             }
             disableForText = presentationData.strings.PrivacyLastSeenSettings_NeverShareWith
             enableForText = presentationData.strings.PrivacyLastSeenSettings_AlwaysShareWith
-        case .voiceMessages:
-            settingTitle = presentationData.strings.Privacy_VoiceMessages_WhoCanSend
-            settingInfoText = presentationData.strings.Privacy_VoiceMessages_CustomHelp
-            disableForText = presentationData.strings.Privacy_GroupsAndChannels_NeverAllow
-            enableForText = presentationData.strings.Privacy_GroupsAndChannels_AlwaysAllow
     }
     
     if case .forwards = kind {
@@ -611,7 +605,7 @@ private func selectivePrivacySettingsControllerEntries(presentationData: Present
     entries.append(.everybody(presentationData.theme, presentationData.strings.PrivacySettings_LastSeenEverybody, state.setting == .everybody))
     entries.append(.contacts(presentationData.theme, presentationData.strings.PrivacySettings_LastSeenContacts, state.setting == .contacts))
     switch kind {
-        case .presence, .voiceCalls, .forwards, .phoneNumber, .voiceMessages:
+        case .presence, .voiceCalls, .forwards, .phoneNumber:
             entries.append(.nobody(presentationData.theme, presentationData.strings.PrivacySettings_LastSeenNobody, state.setting == .nobody))
         case .groupInvitations, .profilePhoto:
             break
@@ -737,8 +731,6 @@ func selectivePrivacySettingsController(context: AccountContext, kind: Selective
                     title = strings.Privacy_Forwards_AlwaysAllow_Title
                 case .phoneNumber:
                     title = strings.PrivacyLastSeenSettings_AlwaysShareWith_Title
-                case .voiceMessages:
-                    title = strings.Privacy_VoiceMessages_AlwaysAllow_Title
             }
         } else {
             switch kind {
@@ -754,8 +746,6 @@ func selectivePrivacySettingsController(context: AccountContext, kind: Selective
                     title = strings.Privacy_Forwards_NeverAllow_Title
                 case .phoneNumber:
                     title = strings.PrivacyLastSeenSettings_NeverShareWith_Title
-                case .voiceMessages:
-                    title = strings.Privacy_VoiceMessages_NeverAllow_Title
             }
         }
         var peerIds: [PeerId: SelectivePrivacyPeer] = [:]
@@ -991,8 +981,6 @@ func selectivePrivacySettingsController(context: AccountContext, kind: Selective
                 title = presentationData.strings.Privacy_Forwards
             case .phoneNumber:
                 title = presentationData.strings.Privacy_PhoneNumber
-            case .voiceMessages:
-                title = presentationData.strings.Privacy_VoiceMessages
         }
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(title), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back), animateChanges: false)
         let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: selectivePrivacySettingsControllerEntries(presentationData: presentationData, kind: kind, state: state, peerName: peerName ?? "", phoneNumber: phoneNumber), style: .blocks, animateChanges: false)
@@ -1071,8 +1059,6 @@ func selectivePrivacySettingsController(context: AccountContext, kind: Selective
                     type = .forwards
                 case .phoneNumber:
                     type = .phoneNumber
-                case .voiceMessages:
-                    type = .voiceMessages
             }
             
             let updateSettingsSignal = context.engine.privacy.updateSelectiveAccountPrivacySettings(type: type, settings: settings)

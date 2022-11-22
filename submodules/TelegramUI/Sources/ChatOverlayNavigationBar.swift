@@ -22,10 +22,15 @@ final class ChatOverlayNavigationBar: ASDisplayNode {
     
     private var validLayout: CGSize?
     
-    private var peerTitle: String = ""
-    var title: String? {
+    private var peerTitle = ""
+    var peerView: PeerView? {
         didSet {
-            let title = self.title ?? ""
+            var title = ""
+            if let peerView = self.peerView {
+                if let peer = peerViewMainPeer(peerView) {
+                    title = EnginePeer(peer).displayTitle(strings: self.strings, displayOrder: self.nameDisplayOrder)
+                }
+            }
             if self.peerTitle != title {
                 self.peerTitle = title
                 if let size = self.validLayout {

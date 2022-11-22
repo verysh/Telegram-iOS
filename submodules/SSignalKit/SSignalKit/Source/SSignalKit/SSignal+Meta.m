@@ -6,11 +6,11 @@
 #import "SAtomic.h"
 #import "SSignal+Pipe.h"
 
-#import <os/lock.h>
+#import <libkern/OSAtomic.h>
 
 @interface SSignalQueueState : NSObject <SDisposable>
 {
-    os_unfair_lock _lock;
+    OSSpinLock _lock;
     bool _executingSignal;
     bool _terminated;
     
@@ -49,7 +49,7 @@
 - (void)enqueueSignal:(SSignal *)signal
 {
     bool startSignal = false;
-    os_unfair_lock_lock(&_lock);
+    OSSpinLockLock(&_lock);
     if (_queueMode && _executingSignal) {
         if (_throttleMode) {
             [_queuedSignals removeAllObjects];
@@ -61,7 +61,7 @@
         _executingSignal = true;
         startSignal = true;
     }
-    os_unfair_lock_unlock(&_lock);
+    OSSpinLockUnlock(&_lock);
     
     if (startSignal)
     {
@@ -89,7 +89,7 @@
     SSignal *nextSignal = nil;
     
     bool terminated = false;
-    os_unfair_lock_lock(&_lock);
+    OSSpinLockLock(&_lock);
     _executingSignal = false;
     
     if (_queueMode)
@@ -105,7 +105,7 @@
     }
     else
         terminated = _terminated;
-    os_unfair_lock_unlock(&_lock);
+    OSSpinLockUnlock(&_lock);
     
     if (terminated)
         [_subscriber putCompletion];
@@ -133,10 +133,10 @@
 - (void)beginCompletion
 {
     bool executingSignal = false;
-    os_unfair_lock_lock(&_lock);
+    OSSpinLockLock(&_lock);
     executingSignal = _executingSignal;
     _terminated = true;
-    os_unfair_lock_unlock(&_lock);
+    OSSpinLockUnlock(&_lock);
     
     if (!executingSignal)
         [_subscriber putCompletion];

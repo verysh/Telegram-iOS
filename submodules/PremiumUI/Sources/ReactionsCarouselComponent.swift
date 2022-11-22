@@ -9,9 +9,6 @@ import AccountContext
 import ReactionSelectionNode
 import TelegramPresentationData
 import AccountContext
-import AnimationCache
-import Postbox
-import MultiAnimationRenderer
 
 final class ReactionsCarouselComponent: Component {
     public typealias EnvironmentType = DemoPageEnvironment
@@ -120,27 +117,21 @@ private class ReactionCarouselNode: ASDisplayNode, UIScrollViewDelegate {
     private var previousInteractionTimestamp: Double = 0.0
     private var timer: SwiftSignalKit.Timer?
     
-    private let animationCache: AnimationCache
-    private let animationRenderer: MultiAnimationRenderer
-    
     init(context: AccountContext, theme: PresentationTheme, reactions: [AvailableReactions.Reaction]) {
         self.context = context
         self.theme = theme
         
-        self.animationCache = context.animationCache
-        self.animationRenderer = context.animationRenderer
-        
-        var reactionMap: [MessageReaction.Reaction: AvailableReactions.Reaction] = [:]
+        var reactionMap: [String: AvailableReactions.Reaction] = [:]
         for reaction in reactions {
             reactionMap[reaction.value] = reaction
         }
         
-        var addedReactions = Set<MessageReaction.Reaction>()
+        var addedReactions = Set<String>()
         var sortedReactions: [AvailableReactions.Reaction] = []
         for emoji in order {
-            if let reaction = reactionMap[.builtin(emoji)] {
+            if let reaction = reactionMap[emoji] {
                 sortedReactions.append(reaction)
-                addedReactions.insert(.builtin(emoji))
+                addedReactions.insert(emoji)
             }
         }
         
@@ -350,7 +341,6 @@ private class ReactionCarouselNode: ASDisplayNode, UIScrollViewDelegate {
                 continue
             }
             let containerNode = ASDisplayNode()
-            
             let itemNode = ReactionNode(context: self.context, theme: self.theme, item: ReactionItem(
                 reaction: ReactionItem.Reaction(rawValue: reaction.value),
                 appearAnimation: reaction.appearAnimation,
@@ -358,9 +348,8 @@ private class ReactionCarouselNode: ASDisplayNode, UIScrollViewDelegate {
                 listAnimation: centerAnimation,
                 largeListAnimation: reaction.activateAnimation,
                 applicationAnimation: aroundAnimation,
-                largeApplicationAnimation: reaction.effectAnimation,
-                isCustom: false
-            ), animationCache: self.animationCache, animationRenderer: self.animationRenderer, loopIdle: false, hasAppearAnimation: false, useDirectRendering: false)
+                largeApplicationAnimation: reaction.effectAnimation
+            ), hasAppearAnimation: false, useDirectRendering: false)
             containerNode.isUserInteractionEnabled = false
             containerNode.addSubnode(itemNode)
             self.addSubnode(containerNode)
@@ -406,21 +395,20 @@ private class ReactionCarouselNode: ASDisplayNode, UIScrollViewDelegate {
         
         targetContainerNode.view.superview?.bringSubviewToFront(targetContainerNode.view)
         
-        let standaloneReactionAnimation = StandaloneReactionAnimation(genericReactionEffect: nil, useDirectRendering: true)
+        let standaloneReactionAnimation = StandaloneReactionAnimation(useDirectRendering: true)
         self.standaloneReactionAnimation = standaloneReactionAnimation
         
         targetContainerNode.addSubnode(standaloneReactionAnimation)
         standaloneReactionAnimation.frame = targetContainerNode.bounds
         standaloneReactionAnimation.animateReactionSelection(
-            context: self.context, theme: self.theme, animationCache: self.animationCache, reaction: ReactionItem(
+            context: self.context, theme: self.theme, reaction: ReactionItem(
                 reaction: ReactionItem.Reaction(rawValue: reaction.value),
                 appearAnimation: reaction.appearAnimation,
                 stillAnimation: reaction.selectAnimation,
                 listAnimation: centerAnimation,
                 largeListAnimation: reaction.activateAnimation,
                 applicationAnimation: aroundAnimation,
-                largeApplicationAnimation: reaction.effectAnimation,
-                isCustom: false
+                largeApplicationAnimation: reaction.effectAnimation
             ),
             avatarPeers: [],
             playHaptic: false,

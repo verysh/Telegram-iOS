@@ -12,21 +12,19 @@ import PresentationDataUtils
 import AccountContext
 import ReactionImageComponent
 import WebPBinding
-import EmojiStatusSelectionComponent
-import EntityKeyboard
 
 private final class QuickReactionSetupControllerArguments {
     let context: AccountContext
-    let openQuickReaction: () -> Void
+    let selectItem: (String) -> Void
     let toggleReaction: () -> Void
     
     init(
         context: AccountContext,
-        openQuickReaction: @escaping () -> Void,
+        selectItem: @escaping (String) -> Void,
         toggleReaction: @escaping () -> Void
     ) {
         self.context = context
-        self.openQuickReaction = openQuickReaction
+        self.selectItem = selectItem
         self.toggleReaction = toggleReaction
     }
 }
@@ -41,21 +39,21 @@ private enum QuickReactionSetupControllerEntry: ItemListNodeEntry {
         case demoHeader
         case demoMessage
         case demoDescription
-        case quickReaction
-        case quickReactionDescription
+        case itemsHeader
+        case item(String)
     }
     
     case demoHeader(String)
-    case demoMessage(wallpaper: TelegramWallpaper, fontSize: PresentationFontSize, bubbleCorners: PresentationChatBubbleCorners, dateTimeFormat: PresentationDateTimeFormat, nameDisplayOrder: PresentationPersonNameOrder, availableReactions: AvailableReactions?, reaction: MessageReaction.Reaction?)
+    case demoMessage(wallpaper: TelegramWallpaper, fontSize: PresentationFontSize, bubbleCorners: PresentationChatBubbleCorners, dateTimeFormat: PresentationDateTimeFormat, nameDisplayOrder: PresentationPersonNameOrder, availableReactions: AvailableReactions?, reaction: String?)
     case demoDescription(String)
-    case quickReaction(String, MessageReaction.Reaction, AvailableReactions)
-    case quickReactionDescription(String)
+    case itemsHeader(String)
+    case item(index: Int, value: String, image: UIImage?, imageIsAnimation: Bool, text: String, isSelected: Bool)
     
     var section: ItemListSectionId {
         switch self {
         case .demoHeader, .demoMessage, .demoDescription:
             return QuickReactionSetupControllerSection.demo.rawValue
-        case .quickReaction, .quickReactionDescription:
+        case .itemsHeader, .item:
             return QuickReactionSetupControllerSection.items.rawValue
         }
     }
@@ -68,10 +66,10 @@ private enum QuickReactionSetupControllerEntry: ItemListNodeEntry {
             return .demoMessage
         case .demoDescription:
             return .demoDescription
-        case .quickReaction:
-            return .quickReaction
-        case .quickReactionDescription:
-            return .quickReactionDescription
+        case .itemsHeader:
+            return .itemsHeader
+        case let .item(_, value, _, _, _, _):
+            return .item(value)
         }
     }
     
@@ -83,10 +81,10 @@ private enum QuickReactionSetupControllerEntry: ItemListNodeEntry {
             return 1
         case .demoDescription:
             return 2
-        case .quickReaction:
+        case .itemsHeader:
             return 3
-        case .quickReactionDescription:
-            return 4
+        case let .item(index, _, _, _, _, _):
+            return 100 + index
         }
     }
     
@@ -110,14 +108,14 @@ private enum QuickReactionSetupControllerEntry: ItemListNodeEntry {
             } else {
                 return false
             }
-        case let .quickReaction(lhsText, lhsReaction, lhsAvailableReactions):
-            if case let .quickReaction(rhsText, rhsReaction, rhsAvailableReactions) = rhs, lhsText == rhsText, lhsReaction == rhsReaction, lhsAvailableReactions == rhsAvailableReactions {
+        case let .itemsHeader(text):
+            if case .itemsHeader(text) = rhs {
                 return true
             } else {
                 return false
             }
-        case let .quickReactionDescription(text):
-            if case .quickReactionDescription(text) = rhs {
+        case let .item(index, value, file, imageIsAnimation, text, isEnabled):
+            if case .item(index, value, file, imageIsAnimation, text, isEnabled) = rhs {
                 return true
             } else {
                 return false
@@ -153,12 +151,28 @@ private enum QuickReactionSetupControllerEntry: ItemListNodeEntry {
             )
         case let .demoDescription(text):
             return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
-        case let .quickReaction(title, reaction, availableReactions):
-            return ItemListReactionItem(context: arguments.context, presentationData: presentationData, title: title, reaction: reaction, availableReactions: availableReactions, sectionId: self.section, style: .blocks, action: {
-                arguments.openQuickReaction()
-            })
-        case let .quickReactionDescription(text):
-            return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
+        case let .itemsHeader(text):
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
+        case let .item(_, value, image, imageIsAnimation, text, isSelected):
+            var imageFitSize = CGSize(width: 30.0, height: 30.0)
+            if imageIsAnimation {
+                imageFitSize.width = floor(imageFitSize.width * 2.0)
+                imageFitSize.height = floor(imageFitSize.height * 2.0)
+            }
+            return ItemListCheckboxItem(
+                presentationData: presentationData,
+                icon: image,
+                iconSize: image?.size.aspectFitted(imageFitSize),
+                title: text,
+                style: .right,
+                color: .accent,
+                checked: isSelected,
+                zeroSeparatorInsets: false,
+                sectionId: self.section,
+                action: {
+                    arguments.selectItem(value)
+                }
+            )
         }
     }
 }
@@ -170,6 +184,7 @@ private struct QuickReactionSetupControllerState: Equatable {
 private func quickReactionSetupControllerEntries(
     presentationData: PresentationData,
     availableReactions: AvailableReactions?,
+    images: [String: (image: UIImage, isAnimation: Bool)],
     reactionSettings: ReactionSettings,
     state: QuickReactionSetupControllerState,
     isPremium: Bool
@@ -185,13 +200,31 @@ private func quickReactionSetupControllerEntries(
             dateTimeFormat: presentationData.dateTimeFormat,
             nameDisplayOrder: presentationData.nameDisplayOrder,
             availableReactions: availableReactions,
-            reaction: state.hasReaction ? reactionSettings.effectiveQuickReaction(hasPremium: isPremium) : nil
+            reaction: state.hasReaction ? reactionSettings.quickReaction : nil
         ))
         entries.append(.demoDescription(presentationData.strings.Settings_QuickReactionSetup_DemoInfo))
         
-        entries.append(.quickReaction(presentationData.strings.Settings_QuickReactionSetup_ChooseQuickReaction, reactionSettings.quickReaction, availableReactions))
-        
-        entries.append(.quickReactionDescription(presentationData.strings.Settings_QuickReactionSetup_ChooseQuickReactionInfo))
+        entries.append(.itemsHeader(presentationData.strings.Settings_QuickReactionSetup_ReactionListHeader))
+        var index = 0
+        for availableReaction in availableReactions.reactions {
+            if !availableReaction.isEnabled {
+                continue
+            }
+            
+            if !isPremium && availableReaction.isPremium {
+                continue
+            }
+            
+            entries.append(.item(
+                index: index,
+                value: availableReaction.value,
+                image: images[availableReaction.value]?.image,
+                imageIsAnimation: images[availableReaction.value]?.isAnimation ?? false,
+                text: availableReaction.title,
+                isSelected: reactionSettings.quickReaction == availableReaction.value
+            ))
+            index += 1
+        }
     }
     
     return entries
@@ -210,14 +243,17 @@ public func quickReactionSetupController(
     var dismissImpl: (() -> Void)?
     let _ = dismissImpl
     
-    var openQuickReactionImpl: (() -> Void)?
-    
     let actionsDisposable = DisposableSet()
     
     let arguments = QuickReactionSetupControllerArguments(
         context: context,
-        openQuickReaction: {
-            openQuickReactionImpl?()
+        selectItem: { reaction in
+            updateState { state in
+                var state = state
+                state.hasReaction = false
+                return state
+            }
+            let _ = context.engine.stickers.updateQuickReaction(reaction: reaction).start()
         },
         toggleReaction: {
             updateState { state in
@@ -239,22 +275,80 @@ public func quickReactionSetupController(
         return reactionSettings
     }
     
+    let images: Signal<[String: (image: UIImage, isAnimation: Bool)], NoError> = context.engine.stickers.availableReactions()
+    |> mapToSignal { availableReactions -> Signal<[String: (image: UIImage, isAnimation: Bool)], NoError> in
+        var signals: [Signal<(String, (image: UIImage, isAnimation: Bool)?), NoError>] = []
+        
+        if let availableReactions = availableReactions {
+            for availableReaction in availableReactions.reactions {
+                if !availableReaction.isEnabled {
+                    continue
+                }
+                if let centerAnimation = availableReaction.centerAnimation {
+                    let signal: Signal<(String, (image: UIImage, isAnimation: Bool)?), NoError> = reactionStaticImage(context: context, animation: centerAnimation, pixelSize: CGSize(width: 72.0 * 2.0, height: 72.0 * 2.0))
+                    |> map { data -> (String, (image: UIImage, isAnimation: Bool)?) in
+                        guard data.isComplete else {
+                            return (availableReaction.value, nil)
+                        }
+                        guard let dataValue = try? Data(contentsOf: URL(fileURLWithPath: data.path)) else {
+                            return (availableReaction.value, nil)
+                        }
+                        guard let image = UIImage(data: dataValue) else {
+                            return (availableReaction.value, nil)
+                        }
+                        return (availableReaction.value, (image, true))
+                    }
+                    signals.append(signal)
+                } else {
+                    let signal: Signal<(String, (image: UIImage, isAnimation: Bool)?), NoError> = context.account.postbox.mediaBox.resourceData(availableReaction.staticIcon.resource)
+                    |> map { data -> (String, (image: UIImage, isAnimation: Bool)?) in
+                        guard data.complete else {
+                            return (availableReaction.value, nil)
+                        }
+                        guard let dataValue = try? Data(contentsOf: URL(fileURLWithPath: data.path)) else {
+                            return (availableReaction.value, nil)
+                        }
+                        guard let image = WebP.convert(fromWebP: dataValue) else {
+                            return (availableReaction.value, nil)
+                        }
+                        
+                        return (availableReaction.value, (image, false))
+                    }
+                    signals.append(signal)
+                }
+            }
+        }
+        
+        return combineLatest(queue: .mainQueue(), signals)
+        |> map { values -> [String: (image: UIImage, isAnimation: Bool)] in
+            var dict: [String: (image: UIImage, isAnimation: Bool)] = [:]
+            for (key, image) in values {
+                if let image = image {
+                    dict[key] = image
+                }
+            }
+            return dict
+        }
+    }
+    
     let presentationData = updatedPresentationData?.signal ?? context.sharedContext.presentationData
     let signal = combineLatest(queue: .mainQueue(),
         presentationData,
         statePromise.get(),
         context.engine.stickers.availableReactions(),
         settings,
+        images,
         context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: context.account.peerId))
     )
     |> deliverOnMainQueue
-    |> map { presentationData, state, availableReactions, settings, accountPeer -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    |> map { presentationData, state, availableReactions, settings, images, accountPeer -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let isPremium = accountPeer?.isPremium ?? false
         let title: String = presentationData.strings.Settings_QuickReactionSetup_Title
         
         let entries = quickReactionSetupControllerEntries(
             presentationData: presentationData,
             availableReactions: availableReactions,
+            images: images,
             reactionSettings: settings,
             state: state,
             isPremium: isPremium
@@ -283,7 +377,7 @@ public func quickReactionSetupController(
     
     let controller = ItemListController(context: context, state: signal)
     
-    controller.didScrollWithOffset = { [weak controller] offset, transition, _, _ in
+    controller.didScrollWithOffset = { [weak controller] offset, transition, _ in
         guard let controller = controller else {
             return
         }
@@ -292,75 +386,6 @@ public func quickReactionSetupController(
                 itemNode.standaloneReactionAnimation?.addRelativeContentOffset(CGPoint(x: 0.0, y: offset), transition: transition)
             }
         }
-    }
-    
-    openQuickReactionImpl = { [weak controller] in
-        let _ = (combineLatest(queue: .mainQueue(),
-            settings,
-            context.engine.stickers.availableReactions()
-        )
-        |> take(1)
-        |> deliverOnMainQueue).start(next: { settings, availableReactions in
-            var currentSelectedFileId: MediaId?
-            switch settings.quickReaction {
-            case .builtin:
-                if let availableReactions = availableReactions {
-                    if let reaction = availableReactions.reactions.first(where: { $0.value == settings.quickReaction }) {
-                        currentSelectedFileId = reaction.selectAnimation.fileId
-                        break
-                    }
-                }
-            case let .custom(fileId):
-                currentSelectedFileId = MediaId(namespace: Namespaces.Media.CloudFile, id: fileId)
-            }
-            
-            var selectedItems = Set<MediaId>()
-            if let currentSelectedFileId = currentSelectedFileId {
-                selectedItems.insert(currentSelectedFileId)
-            }
-            
-            guard let controller = controller else {
-                return
-            }
-            var sourceItemNode: ItemListReactionItemNode?
-            controller.forEachItemNode { itemNode in
-                if let itemNode = itemNode as? ItemListReactionItemNode {
-                    sourceItemNode = itemNode
-                }
-            }
-            
-            if let sourceItemNode = sourceItemNode {
-                controller.present(EmojiStatusSelectionController(
-                    context: context,
-                    mode: .quickReactionSelection(completion: {
-                        updateState { state in
-                            var state = state
-                            state.hasReaction = false
-                            return state
-                        }
-                    }),
-                    sourceView: sourceItemNode.iconView,
-                    emojiContent: EmojiPagerContentComponent.emojiInputData(
-                        context: context,
-                        animationCache: context.animationCache,
-                        animationRenderer: context.animationRenderer,
-                        isStandalone: false,
-                        isStatusSelection: false,
-                        isReactionSelection: true,
-                        isQuickReactionSelection: true,
-                        topReactionItems: [],
-                        areUnicodeEmojiEnabled: false,
-                        areCustomEmojiEnabled: true,
-                        chatPeerId: context.account.peerId,
-                        selectedItems: selectedItems
-                    ),
-                    currentSelection: nil,
-                    destinationItemView: { [weak sourceItemNode] in
-                        return sourceItemNode?.iconView
-                    }
-                ), in: .window(.root))
-            }
-        })
     }
     
     dismissImpl = { [weak controller] in

@@ -2,7 +2,7 @@
 
 #import <LegacyComponents/LegacyComponents.h>
 #import <WatchConnectivity/WatchConnectivity.h>
-#import <os/lock.h>
+#import <libkern/OSAtomic.h>
 #import <WatchCommon/WatchCommon.h>
 
 @interface TGBridgeSignalManager : NSObject
@@ -31,16 +31,16 @@
     
     TGBridgeSignalManager *_signalManager;
     
-    os_unfair_lock _incomingQueueLock;
+    OSSpinLock _incomingQueueLock;
     NSMutableArray *_incomingMessageQueue;
     
     bool _requestSubscriptionList;
     NSArray *_initialSubscriptionList;
     
-    os_unfair_lock _outgoingQueueLock;
+    OSSpinLock _outgoingQueueLock;
     NSMutableArray *_outgoingMessageQueue;
     
-    os_unfair_lock _replyHandlerMapLock;
+    OSSpinLock _replyHandlerMapLock;
     NSMutableDictionary *_replyHandlerMap;
     
     SPipe *_appInstalled;
@@ -102,14 +102,14 @@
     if (self.isRunning)
         return;
     
-    os_unfair_lock_lock(&_incomingQueueLock);
+    OSSpinLockLock(&_incomingQueueLock);
     _isRunning = true;
     
     for (id message in _incomingMessageQueue)
         [self handleMessage:message replyHandler:nil finishTask:nil completion:nil];
     
     [_incomingMessageQueue removeAllObjects];
-    os_unfair_lock_unlock(&_incomingQueueLock);
+    OSSpinLockUnlock(&_incomingQueueLock);
     
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [self dispatch:^{
@@ -189,7 +189,7 @@
     };
     
     id message = [NSKeyedUnarchiver unarchiveObjectWithData:messageData];
-    os_unfair_lock_lock(&_incomingQueueLock);
+    OSSpinLockLock(&_incomingQueueLock);
     if (!self.isRunning)
     {
         [_incomingMessageQueue addObject:message];
@@ -199,10 +199,10 @@
         
         finishTask(4.0);
         
-        os_unfair_lock_unlock(&_incomingQueueLock);
+        OSSpinLockUnlock(&_incomingQueueLock);
         return;
     }
-    os_unfair_lock_unlock(&_incomingQueueLock);
+    OSSpinLockUnlock(&_incomingQueueLock);
     
     [self handleMessage:message replyHandler:replyHandler finishTask:finishTask completion:completion];
 }
@@ -261,9 +261,9 @@
                 //TGLog(@"[BridgeServer] Halt all active subscriptions");
                 [_signalManager haltAllSignals];
                 
-                os_unfair_lock_lock(&_outgoingQueueLock);
+                OSSpinLockLock(&_outgoingQueueLock);
                 [_outgoingMessageQueue removeAllObjects];
-                os_unfair_lock_unlock(&_outgoingQueueLock);
+                OSSpinLockUnlock(&_outgoingQueueLock);
             }
             
             _sessionId = ping.sessionId;
@@ -307,9 +307,9 @@
     SSignal *subscriptionHandler = _handler(subscription);
     if (replyHandler != nil)
     {
-        os_unfair_lock_lock(&_replyHandlerMapLock);
+        OSSpinLockLock(&_replyHandlerMapLock);
         _replyHandlerMap[@(subscription.identifier)] = replyHandler;
-        os_unfair_lock_unlock(&_replyHandlerMapLock);
+        OSSpinLockUnlock(&_replyHandlerMapLock);
     }
     
     if (subscriptionHandler != nil)
@@ -318,11 +318,11 @@
         {
             STimer *timer = [[STimer alloc] initWithTimeout:2.0 repeat:false completion:^
             {
-                os_unfair_lock_lock(&_replyHandlerMapLock);
+                OSSpinLockLock(&_replyHandlerMapLock);
                 void (^reply)(NSData *) = _replyHandlerMap[@(subscription.identifier)];
                 if (reply == nil)
                 {
-                    os_unfair_lock_unlock(&_replyHandlerMapLock);
+                    OSSpinLockUnlock(&_replyHandlerMapLock);
                     
                     if (finishTask != nil)
                         finishTask(2.0);
@@ -331,7 +331,7 @@
                 
                 reply([NSData data]);
                 [_replyHandlerMap removeObjectForKey:@(subscription.identifier)];
-                os_unfair_lock_unlock(&_replyHandlerMapLock);
+                OSSpinLockUnlock(&_replyHandlerMapLock);
                 
                 if (finishTask != nil)
                     finishTask(4.0);
@@ -369,11 +369,11 @@
     }
     else
     {
-        os_unfair_lock_lock(&_replyHandlerMapLock);
+        OSSpinLockLock(&_replyHandlerMapLock);
         void (^reply)(NSData *) = _replyHandlerMap[@(subscription.identifier)];
         if (reply == nil)
         {
-            os_unfair_lock_unlock(&_replyHandlerMapLock);
+            OSSpinLockUnlock(&_replyHandlerMapLock);
             
             if (finishTask != nil)
                 finishTask(2.0);
@@ -382,7 +382,7 @@
         
         reply([NSData data]);
         [_replyHandlerMap removeObjectForKey:@(subscription.identifier)];
-        os_unfair_lock_unlock(&_replyHandlerMapLock);
+        OSSpinLockUnlock(&_replyHandlerMapLock);
         
         if (finishTask != nil)
             finishTask(2.0);
@@ -410,11 +410,11 @@
             break;
     }
     
-    os_unfair_lock_lock(&_replyHandlerMapLock);
+    OSSpinLockLock(&_replyHandlerMapLock);
     void (^reply)(NSData *) = _replyHandlerMap[@(subscription.identifier)];
     if (reply != nil)
         [_replyHandlerMap removeObjectForKey:@(subscription.identifier)];
-    os_unfair_lock_unlock(&_replyHandlerMapLock);
+    OSSpinLockUnlock(&_replyHandlerMapLock);
     
     if (_processingNotification)
     {
@@ -460,7 +460,7 @@
 
 - (void)_enqueueResponse:(TGBridgeResponse *)response forSubscription:(TGBridgeSubscription *)subscription
 {
-    os_unfair_lock_lock(&_outgoingQueueLock);
+    OSSpinLockLock(&_outgoingQueueLock);
     NSMutableArray *updatedResponses = (_outgoingMessageQueue != nil) ? [_outgoingMessageQueue mutableCopy] : [[NSMutableArray alloc] init];
     
     if (subscription.dropPreviouslyQueued)
@@ -479,7 +479,7 @@
     [updatedResponses addObject:response];
     
     _outgoingMessageQueue = updatedResponses;
-    os_unfair_lock_unlock(&_outgoingQueueLock);
+    OSSpinLockUnlock(&_outgoingQueueLock);
 }
 
 - (void)_sendQueuedResponses
@@ -487,7 +487,7 @@
     if (_processingNotification)
         return;
     
-    os_unfair_lock_lock(&_outgoingQueueLock);
+    OSSpinLockLock(&_outgoingQueueLock);
     
     if (_outgoingMessageQueue.count > 0)
     {
@@ -501,7 +501,7 @@
         
         [_outgoingMessageQueue removeAllObjects];
     }
-    os_unfair_lock_unlock(&_outgoingQueueLock);
+    OSSpinLockUnlock(&_outgoingQueueLock);
 }
 
 - (void)_requestSubscriptionList 
@@ -669,7 +669,7 @@
 
 @interface TGBridgeSignalManager()
 {
-    os_unfair_lock _lock;
+    OSSpinLock _lock;
     NSMutableDictionary *_disposables;
 }
 @end
@@ -689,9 +689,9 @@
 - (void)dealloc
 {
     NSArray *disposables = nil;
-    os_unfair_lock_lock(&_lock);
+    OSSpinLockLock(&_lock);
     disposables = [_disposables allValues];
-    os_unfair_lock_unlock(&_lock);
+    OSSpinLockUnlock(&_lock);
     
     for (id<SDisposable> disposable in disposables)
     {
@@ -705,13 +705,13 @@
         return false;
     
     bool produce = false;
-    os_unfair_lock_lock(&_lock);
+    OSSpinLockLock(&_lock);
     if (_disposables[key] == nil)
     {
         _disposables[key] = [[SMetaDisposable alloc] init];
         produce = true;
     }
-    os_unfair_lock_unlock(&_lock);
+    OSSpinLockUnlock(&_lock);
     
     if (produce)
     {
@@ -721,24 +721,24 @@
             __strong TGBridgeSignalManager *strongSelf = weakSelf;
             if (strongSelf != nil)
             {
-                os_unfair_lock_lock(&strongSelf->_lock);
+                OSSpinLockLock(&strongSelf->_lock);
                 [strongSelf->_disposables removeObjectForKey:key];
-                os_unfair_lock_unlock(&strongSelf->_lock);
+                OSSpinLockUnlock(&strongSelf->_lock);
             }
         } completed:^
         {
             __strong TGBridgeSignalManager *strongSelf = weakSelf;
             if (strongSelf != nil)
             {
-                os_unfair_lock_lock(&strongSelf->_lock);
+                OSSpinLockLock(&strongSelf->_lock);
                 [strongSelf->_disposables removeObjectForKey:key];
-                os_unfair_lock_unlock(&strongSelf->_lock);
+                OSSpinLockUnlock(&strongSelf->_lock);
             }
         }];
         
-        os_unfair_lock_lock(&_lock);
+        OSSpinLockLock(&_lock);
         [(SMetaDisposable *)_disposables[key] setDisposable:disposable];
-        os_unfair_lock_unlock(&_lock);
+        OSSpinLockUnlock(&_lock);
     }
     
     return produce;
@@ -749,22 +749,22 @@
     if (key == nil)
         return;
     
-    os_unfair_lock_lock(&_lock);
+    OSSpinLockLock(&_lock);
     if (_disposables[key] != nil)
     {
         [_disposables[key] dispose];
         [_disposables removeObjectForKey:key];
     }
-    os_unfair_lock_unlock(&_lock);
+    OSSpinLockUnlock(&_lock);
 }
 
 - (void)haltAllSignals
 {
-    os_unfair_lock_lock(&_lock);
+    OSSpinLockLock(&_lock);
     for (NSObject <SDisposable> *disposable in _disposables.allValues)
         [disposable dispose];
     [_disposables removeAllObjects];
-    os_unfair_lock_unlock(&_lock);
+    OSSpinLockUnlock(&_lock);
 }
 
 @end

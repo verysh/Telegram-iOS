@@ -621,10 +621,6 @@ final public class AnimationView: AnimationViewBase {
   public func logHierarchyKeypaths() {
     animationLayer?.logHierarchyKeypaths()
   }
-    
-  public func allKeypaths(predicate: (AnimationKeypath) -> Bool) -> [String] {
-    return animationLayer?.allKeypaths(predicate: predicate) ?? []
-  }
 
   /// Searches for the nearest child layer to the first Keypath and adds the subview
   /// to that layer. The subview will move and animate with the child layer.
@@ -659,10 +655,6 @@ final public class AnimationView: AnimationViewBase {
       sublayer.addSublayer(subViewLayer)
     }
   }
-    
-    public func allLayers(forKeypath keypath: AnimationKeypath) -> [CALayer] {
-        return animationLayer?.allLayers(for: keypath) ?? []
-    }
 
   /// Converts a CGRect from the AnimationView's coordinate space into the
   /// coordinate space of the layer found at Keypath.

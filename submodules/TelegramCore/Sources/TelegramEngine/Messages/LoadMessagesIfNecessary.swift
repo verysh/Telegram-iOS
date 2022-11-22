@@ -94,7 +94,7 @@ func _internal_getMessagesLoadIfNecessary(_ messageIds: [MessageId], postbox: Po
                         }
                         
                         var peers: [Peer] = []
-                        var peerPresences: [PeerId: Api.User] = [:]
+                        var peerPresences: [PeerId: PeerPresence] = [:]
                         for chat in chats {
                             if let groupOrChannel = parseTelegramGroupOrChannel(chat: chat) {
                                 peers.append(groupOrChannel)
@@ -103,7 +103,9 @@ func _internal_getMessagesLoadIfNecessary(_ messageIds: [MessageId], postbox: Po
                         for user in users {
                             let telegramUser = TelegramUser(user: user)
                             peers.append(telegramUser)
-                            peerPresences[telegramUser.id] = user
+                            if let presence = TelegramUserPresence(apiUser: user) {
+                                peerPresences[telegramUser.id] = presence
+                            }
                         }
                         
                         updatePeers(transaction: transaction, peers: peers, update: { _, updated -> Peer in

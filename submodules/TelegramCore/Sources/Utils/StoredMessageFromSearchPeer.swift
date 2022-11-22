@@ -2,21 +2,17 @@ import Foundation
 import Postbox
 import SwiftSignalKit
 
-func _internal_storedMessageFromSearchPeer(account: Account, peer: Peer) -> Signal<Peer, NoError> {
-    return account.postbox.transaction { transaction -> Peer in
+func _internal_storedMessageFromSearchPeer(account: Account, peer: Peer) -> Signal<PeerId, NoError> {
+    return account.postbox.transaction { transaction -> PeerId in
         if transaction.getPeer(peer.id) == nil {
             updatePeers(transaction: transaction, peers: [peer], update: { previousPeer, updatedPeer in
                 return updatedPeer
             })
         }
         if let group = transaction.getPeer(peer.id) as? TelegramGroup, let migrationReference = group.migrationReference {
-            if let migrationPeer = transaction.getPeer(migrationReference.peerId) {
-                return migrationPeer
-            } else {
-                return peer
-            }
+            return migrationReference.peerId
         }
-        return peer
+        return peer.id
     }
 }
 

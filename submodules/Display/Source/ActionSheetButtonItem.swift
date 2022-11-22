@@ -87,7 +87,13 @@ public class ActionSheetButtonNode: ActionSheetItemNode {
         
         self.button.highligthedChanged = { [weak self] highlighted in
             if let strongSelf = self {
-                strongSelf.setHighlighted(highlighted, animated: true)
+                if highlighted {
+                    strongSelf.backgroundNode.backgroundColor = strongSelf.theme.itemHighlightedBackgroundColor
+                } else {
+                    UIView.animate(withDuration: 0.3, animations: {
+                        strongSelf.backgroundNode.backgroundColor = strongSelf.theme.itemBackgroundColor
+                    })
+                }
             }
         }
         
@@ -98,35 +104,16 @@ public class ActionSheetButtonNode: ActionSheetItemNode {
         }
     }
     
-    override func setHighlighted(_ highlighted: Bool, animated: Bool) {
-        self.highlightedUpdated(highlighted)
-        if highlighted {
-            self.backgroundNode.backgroundColor = self.theme.itemHighlightedBackgroundColor
-        } else {
-            if animated {
-                UIView.animate(withDuration: 0.3, animations: {
-                    self.backgroundNode.backgroundColor = self.theme.itemBackgroundColor
-                })
-            } else {
-                self.backgroundNode.backgroundColor = self.theme.itemBackgroundColor
-            }
-        }
-    }
-    
-    override func performAction() {
-        self.buttonPressed()
-    }
-    
     public override func didLoad() {
         super.didLoad()
         
         self.pointerInteraction = PointerInteraction(node: self, style: .hover, willEnter: { [weak self] in
             if let strongSelf = self {
-                strongSelf.setHighlighted(true, animated: false)
+                strongSelf.backgroundNode.backgroundColor = strongSelf.theme.itemHighlightedBackgroundColor
             }
         }, willExit: { [weak self] in
             if let strongSelf = self {
-                strongSelf.setHighlighted(false, animated: false)
+                strongSelf.backgroundNode.backgroundColor = strongSelf.theme.itemBackgroundColor
             }
         })
     }

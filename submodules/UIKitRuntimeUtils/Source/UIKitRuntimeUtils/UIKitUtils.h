@@ -23,4 +23,4 @@ void applySmoothRoundedCornersImpl(CALayer * _Nonnull layer);
 
 @end
 
-UIView<UIKitPortalViewProtocol> * _Nullable makePortalView(bool matchPosition);
+UIView<UIKitPortalViewProtocol> * _Nullable makePortalView();

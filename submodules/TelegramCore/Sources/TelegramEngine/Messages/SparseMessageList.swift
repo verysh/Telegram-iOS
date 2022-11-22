@@ -7,7 +7,6 @@ public final class SparseMessageList {
         private let queue: Queue
         private let account: Account
         private let peerId: PeerId
-        private let threadId: Int64?
         private let messageTag: MessageTags
 
         private struct TopSection: Equatable {
@@ -92,79 +91,76 @@ public final class SparseMessageList {
 
         let statePromise = Promise<SparseMessageList.State>()
 
-        init(queue: Queue, account: Account, peerId: PeerId, threadId: Int64?, messageTag: MessageTags) {
+        init(queue: Queue, account: Account, peerId: PeerId, messageTag: MessageTags) {
             self.queue = queue
             self.account = account
             self.peerId = peerId
-            self.threadId = threadId
             self.messageTag = messageTag
 
             self.resetTopSection()
 
-            if self.threadId == nil {
-                self.sparseItemsDisposable = (self.account.postbox.transaction { transaction -> Api.InputPeer? in
-                    return transaction.getPeer(peerId).flatMap(apiInputPeer)
-                }
-                                              |> mapToSignal { inputPeer -> Signal<SparseItems, NoError> in
-                    guard let inputPeer = inputPeer else {
-                        return .single(SparseItems(items: []))
-                    }
-                    guard let messageFilter = messageFilterForTagMask(messageTag) else {
-                        return .single(SparseItems(items: []))
-                    }
-                    return account.network.request(Api.functions.messages.getSearchResultsPositions(peer: inputPeer, filter: messageFilter, offsetId: 0, limit: 1000))
-                    |> map { result -> SparseItems in
-                        switch result {
-                        case let .searchResultsPositions(totalCount, positions):
-                            struct Position: Equatable {
-                                var id: Int32
-                                var date: Int32
-                                var offset: Int
-                            }
-                            var positions: [Position] = positions.map { position -> Position in
-                                switch position {
-                                case let .searchResultPosition(id, date, offset):
-                                    return Position(id: id, date: date, offset: Int(offset))
-                                }
-                            }
-                            positions.sort(by: { lhs, rhs in
-                                return lhs.id > rhs.id
-                            })
-                            
-                            var result = SparseItems(items: [])
-                            for i in 0 ..< positions.count {
-                                if i != 0 {
-                                    let deltaCount = positions[i].offset - 1 - positions[i - 1].offset
-                                    if deltaCount > 0 {
-                                        result.items.append(.range(count: deltaCount))
-                                    }
-                                }
-                                result.items.append(.anchor(id: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: positions[i].id), timestamp: positions[i].date, message: nil))
-                                if i == positions.count - 1 {
-                                    let remainingCount = Int(totalCount) - 1 - positions[i].offset
-                                    if remainingCount > 0 {
-                                        result.items.append(.range(count: remainingCount))
-                                    }
-                                }
-                            }
-                            
-                            return result
-                        }
-                    }
-                    |> `catch` { _ -> Signal<SparseItems, NoError> in
-                        return .single(SparseItems(items: []))
-                    }
-                }
-                |> deliverOn(self.queue)).start(next: { [weak self] sparseItems in
-                    guard let strongSelf = self else {
-                        return
-                    }
-                    strongSelf.sparseItems = sparseItems
-                    if strongSelf.topSection != nil {
-                        strongSelf.updateState()
-                    }
-                })
+            self.sparseItemsDisposable = (self.account.postbox.transaction { transaction -> Api.InputPeer? in
+                return transaction.getPeer(peerId).flatMap(apiInputPeer)
             }
+            |> mapToSignal { inputPeer -> Signal<SparseItems, NoError> in
+                guard let inputPeer = inputPeer else {
+                    return .single(SparseItems(items: []))
+                }
+                guard let messageFilter = messageFilterForTagMask(messageTag) else {
+                    return .single(SparseItems(items: []))
+                }
+                return account.network.request(Api.functions.messages.getSearchResultsPositions(peer: inputPeer, filter: messageFilter, offsetId: 0, limit: 1000))
+                |> map { result -> SparseItems in
+                    switch result {
+                    case let .searchResultsPositions(totalCount, positions):
+                        struct Position: Equatable {
+                            var id: Int32
+                            var date: Int32
+                            var offset: Int
+                        }
+                        var positions: [Position] = positions.map { position -> Position in
+                            switch position {
+                            case let .searchResultPosition(id, date, offset):
+                                return Position(id: id, date: date, offset: Int(offset))
+                            }
+                        }
+                        positions.sort(by: { lhs, rhs in
+                            return lhs.id > rhs.id
+                        })
+
+                        var result = SparseItems(items: [])
+                        for i in 0 ..< positions.count {
+                            if i != 0 {
+                                let deltaCount = positions[i].offset - 1 - positions[i - 1].offset
+                                if deltaCount > 0 {
+                                    result.items.append(.range(count: deltaCount))
+                                }
+                            }
+                            result.items.append(.anchor(id: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: positions[i].id), timestamp: positions[i].date, message: nil))
+                            if i == positions.count - 1 {
+                                let remainingCount = Int(totalCount) - 1 - positions[i].offset
+                                if remainingCount > 0 {
+                                    result.items.append(.range(count: remainingCount))
+                                }
+                            }
+                        }
+
+                        return result
+                    }
+                }
+                |> `catch` { _ -> Signal<SparseItems, NoError> in
+                    return .single(SparseItems(items: []))
+                }
+            }
+            |> deliverOn(self.queue)).start(next: { [weak self] sparseItems in
+                guard let strongSelf = self else {
+                    return
+                }
+                strongSelf.sparseItems = sparseItems
+                if strongSelf.topSection != nil {
+                    strongSelf.updateState()
+                }
+            })
 
             self.deletedMessagesDisposable = (account.postbox.combinedView(keys: [.deletedMessages(peerId: peerId)])
             |> deliverOn(self.queue)).start(next: { [weak self] views in
@@ -187,11 +183,12 @@ public final class SparseMessageList {
 
         private func resetTopSection() {
             let count: Int
+            /*#if DEBUG
+            count = 20
+            #else*/
             count = 200
-            
-            let location: ChatLocationInput = .peer(peerId: self.peerId, threadId: self.threadId)
-            
-            self.topItemsDisposable.set((self.account.postbox.aroundMessageHistoryViewForLocation(location, anchor: .upperBound, ignoreMessagesInTimestampRange: nil, count: count, fixedCombinedReadStates: nil, topTaggedMessageIdNamespaces: Set(), tagMask: self.messageTag, appendMessagesFromTheSameGroup: false, namespaces: .not(Set(Namespaces.Message.allScheduled)), orderStatistics: [])
+            //#endif
+            self.topItemsDisposable.set((self.account.postbox.aroundMessageHistoryViewForLocation(.peer(peerId: peerId), anchor: .upperBound, ignoreMessagesInTimestampRange: nil, count: count, fixedCombinedReadStates: nil, topTaggedMessageIdNamespaces: Set(), tagMask: self.messageTag, appendMessagesFromTheSameGroup: false, namespaces: .not(Set(Namespaces.Message.allScheduled)), orderStatistics: [])
             |> deliverOn(self.queue)).start(next: { [weak self] view, updateType, _ in
                 guard let strongSelf = self else {
                     return
@@ -691,11 +688,11 @@ public final class SparseMessageList {
         }
     }
 
-    init(account: Account, peerId: PeerId, threadId: Int64?, messageTag: MessageTags) {
+    init(account: Account, peerId: PeerId, messageTag: MessageTags) {
         self.queue = Queue()
         let queue = self.queue
         self.impl = QueueLocalObject(queue: queue, generate: {
-            return Impl(queue: queue, account: account, peerId: peerId, threadId: threadId, messageTag: messageTag)
+            return Impl(queue: queue, account: account, peerId: peerId, messageTag: messageTag)
         })
     }
 
@@ -828,7 +825,6 @@ public final class SparseMessageCalendar {
         private let queue: Queue
         private let account: Account
         private let peerId: PeerId
-        private let threadId: Int64?
         private let messageTag: MessageTags
 
         private var state: InternalState
@@ -846,11 +842,10 @@ public final class SparseMessageCalendar {
             return self.isLoadingMorePromise.get()
         }
 
-        init(queue: Queue, account: Account, peerId: PeerId, threadId: Int64?, messageTag: MessageTags) {
+        init(queue: Queue, account: Account, peerId: PeerId, messageTag: MessageTags) {
             self.queue = queue
             self.account = account
             self.peerId = peerId
-            self.threadId = threadId
             self.messageTag = messageTag
 
             self.state = InternalState(nextRequestOffset: 0, minTimestamp: nil, messagesByDay: [:])
@@ -883,16 +878,13 @@ public final class SparseMessageCalendar {
 
             self.statePromise.set(.single(self.state))
 
-            return _internal_clearHistoryInRangeInteractively(postbox: self.account.postbox, peerId: self.peerId, threadId: self.threadId, minTimestamp: minTimestamp, maxTimestamp: maxTimestamp, type: type).start(completed: {
+            return _internal_clearHistoryInRangeInteractively(postbox: self.account.postbox, peerId: self.peerId, minTimestamp: minTimestamp, maxTimestamp: maxTimestamp, type: type).start(completed: {
                 completion()
             })
         }
 
         private func loadMore() {
             guard let nextRequestOffset = self.state.nextRequestOffset else {
-                return
-            }
-            if self.threadId != nil {
                 return
             }
 
@@ -933,7 +925,7 @@ public final class SparseMessageCalendar {
                         case let .searchResultsCalendar(_, _, minDate, minMsgId, _, periods, messages, chats, users):
                             var parsedMessages: [StoreMessage] = []
                             var peers: [Peer] = []
-                            var peerPresences: [PeerId: Api.User] = [:]
+                            var peerPresences: [PeerId: PeerPresence] = [:]
 
                             for chat in chats {
                                 if let groupOrChannel = parseTelegramGroupOrChannel(chat: chat) {
@@ -943,7 +935,9 @@ public final class SparseMessageCalendar {
                             for user in users {
                                 let telegramUser = TelegramUser(user: user)
                                 peers.append(telegramUser)
-                                peerPresences[telegramUser.id] = user
+                                if let presence = TelegramUserPresence(apiUser: user) {
+                                    peerPresences[telegramUser.id] = presence
+                                }
                             }
 
                             for message in messages {
@@ -1016,11 +1010,11 @@ public final class SparseMessageCalendar {
     public var minTimestamp: Int32?
     private var disposable: Disposable?
 
-    init(account: Account, peerId: PeerId, threadId: Int64?, messageTag: MessageTags) {
+    init(account: Account, peerId: PeerId, messageTag: MessageTags) {
         let queue = Queue()
         self.queue = queue
         self.impl = QueueLocalObject(queue: queue, generate: {
-            return Impl(queue: queue, account: account, peerId: peerId, threadId: threadId, messageTag: messageTag)
+            return Impl(queue: queue, account: account, peerId: peerId, messageTag: messageTag)
         })
 
         self.disposable = self.state.start(next: { [weak self] state in

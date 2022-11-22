@@ -271,9 +271,7 @@ open class ContextControllerSourceView: UIView {
     public weak var additionalActivationProgressLayer: CALayer?
     public var targetNodeForActivationProgress: ASDisplayNode?
     public var targetViewForActivationProgress: UIView?
-    public weak var targetLayerForActivationProgress: CALayer?
     public var targetNodeForActivationProgressContentRect: CGRect?
-    public var useSublayerTransformForActivation: Bool = true
     
     override public init(frame: CGRect) {
         super.init(frame: frame)
@@ -299,42 +297,35 @@ open class ContextControllerSourceView: UIView {
             if let customActivationProgress = strongSelf.customActivationProgress {
                 customActivationProgress(progress, update)
             } else if strongSelf.animateScale {
-                let targetLayer: CALayer
+                let targetView: UIView
                 let targetContentRect: CGRect
                 if let targetNodeForActivationProgress = strongSelf.targetNodeForActivationProgress {
-                    targetLayer = targetNodeForActivationProgress.layer
+                    targetView = targetNodeForActivationProgress.view
                     if let targetNodeForActivationProgressContentRect = strongSelf.targetNodeForActivationProgressContentRect {
                         targetContentRect = targetNodeForActivationProgressContentRect
                     } else {
-                        targetContentRect = CGRect(origin: CGPoint(), size: targetLayer.bounds.size)
+                        targetContentRect = CGRect(origin: CGPoint(), size: targetView.bounds.size)
                     }
                 } else if let targetViewForActivationProgress = strongSelf.targetViewForActivationProgress {
-                    targetLayer = targetViewForActivationProgress.layer
+                    targetView = targetViewForActivationProgress
                     if let targetNodeForActivationProgressContentRect = strongSelf.targetNodeForActivationProgressContentRect {
                         targetContentRect = targetNodeForActivationProgressContentRect
                     } else {
-                        targetContentRect = CGRect(origin: CGPoint(), size: targetLayer.bounds.size)
-                    }
-                } else if let targetLayerForActivationProgress = strongSelf.targetLayerForActivationProgress {
-                    targetLayer = targetLayerForActivationProgress
-                    if let targetNodeForActivationProgressContentRect = strongSelf.targetNodeForActivationProgressContentRect {
-                        targetContentRect = targetNodeForActivationProgressContentRect
-                    } else {
-                        targetContentRect = CGRect(origin: CGPoint(), size: targetLayer.bounds.size)
+                        targetContentRect = CGRect(origin: CGPoint(), size: targetView.bounds.size)
                     }
                 } else {
-                    targetLayer = strongSelf.layer
-                    targetContentRect = CGRect(origin: CGPoint(), size: targetLayer.bounds.size)
+                    targetView = strongSelf
+                    targetContentRect = CGRect(origin: CGPoint(), size: targetView.bounds.size)
                 }
                 
                 let scaleSide = targetContentRect.width
                 let minScale: CGFloat = max(0.7, (scaleSide - 15.0) / scaleSide)
                 let currentScale = 1.0 * (1.0 - progress) + minScale * progress
                 
-                let originalCenterOffsetX: CGFloat = targetLayer.bounds.width / 2.0 - targetContentRect.midX
+                let originalCenterOffsetX: CGFloat = targetView.bounds.width / 2.0 - targetContentRect.midX
                 let scaledCenterOffsetX: CGFloat = originalCenterOffsetX * currentScale
                 
-                let originalCenterOffsetY: CGFloat = targetLayer.bounds.height / 2.0 - targetContentRect.midY
+                let originalCenterOffsetY: CGFloat = targetView.bounds.height / 2.0 - targetContentRect.midY
                 let scaledCenterOffsetY: CGFloat = originalCenterOffsetY * currentScale
                 
                 let scaleMidX: CGFloat = scaledCenterOffsetX - originalCenterOffsetX
@@ -343,38 +334,22 @@ open class ContextControllerSourceView: UIView {
                 switch update {
                 case .update:
                     let sublayerTransform = CATransform3DTranslate(CATransform3DScale(CATransform3DIdentity, currentScale, currentScale, 1.0), scaleMidX, scaleMidY, 0.0)
-                    if strongSelf.useSublayerTransformForActivation {
-                        targetLayer.sublayerTransform = sublayerTransform
-                    } else {
-                        targetLayer.transform = sublayerTransform
-                    }
+                    targetView.layer.sublayerTransform = sublayerTransform
                     if let additionalActivationProgressLayer = strongSelf.additionalActivationProgressLayer {
                         additionalActivationProgressLayer.transform = sublayerTransform
                     }
                 case .begin:
                     let sublayerTransform = CATransform3DTranslate(CATransform3DScale(CATransform3DIdentity, currentScale, currentScale, 1.0), scaleMidX, scaleMidY, 0.0)
-                    if strongSelf.useSublayerTransformForActivation {
-                        targetLayer.sublayerTransform = sublayerTransform
-                    } else {
-                        targetLayer.transform = sublayerTransform
-                    }
+                    targetView.layer.sublayerTransform = sublayerTransform
                     if let additionalActivationProgressLayer = strongSelf.additionalActivationProgressLayer {
                         additionalActivationProgressLayer.transform = sublayerTransform
                     }
                 case .ended:
                     let sublayerTransform = CATransform3DTranslate(CATransform3DScale(CATransform3DIdentity, currentScale, currentScale, 1.0), scaleMidX, scaleMidY, 0.0)
+                    let previousTransform = targetView.layer.sublayerTransform
+                    targetView.layer.sublayerTransform = sublayerTransform
                     
-                    if strongSelf.useSublayerTransformForActivation {
-                        let previousTransform = targetLayer.sublayerTransform
-                        targetLayer.sublayerTransform = sublayerTransform
-                        
-                        targetLayer.animate(from: NSValue(caTransform3D: previousTransform), to: NSValue(caTransform3D: sublayerTransform), keyPath: "sublayerTransform", timingFunction: CAMediaTimingFunctionName.easeOut.rawValue, duration: 0.2)
-                    } else {
-                        let previousTransform = targetLayer.transform
-                        targetLayer.transform = sublayerTransform
-                        
-                        targetLayer.animate(from: NSValue(caTransform3D: previousTransform), to: NSValue(caTransform3D: sublayerTransform), keyPath: "transform", timingFunction: CAMediaTimingFunctionName.easeOut.rawValue, duration: 0.2)
-                    }
+                    targetView.layer.animate(from: NSValue(caTransform3D: previousTransform), to: NSValue(caTransform3D: sublayerTransform), keyPath: "sublayerTransform", timingFunction: CAMediaTimingFunctionName.easeOut.rawValue, duration: 0.2)
                     
                     if let additionalActivationProgressLayer = strongSelf.additionalActivationProgressLayer {
                         DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 0.2, execute: {

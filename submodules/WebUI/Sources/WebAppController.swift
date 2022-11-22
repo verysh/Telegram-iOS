@@ -20,7 +20,6 @@ import UrlHandling
 import MoreButtonNode
 import BotPaymentsUI
 import PromptUI
-import PhoneNumberFormat
 
 private let durgerKingBotIds: [Int64] = [5104055776, 2200339955]
 
@@ -350,7 +349,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                     })
                 }
             } else {
-                let _ = (context.engine.messages.requestWebView(peerId: controller.peerId, botId: controller.botId, url: controller.url, payload: controller.payload, themeParams: generateWebAppThemeParams(presentationData.theme), fromMenu: controller.fromMenu, replyToMessageId: controller.replyToMessageId, threadId: controller.threadId)
+                let _ = (context.engine.messages.requestWebView(peerId: controller.peerId, botId: controller.botId, url: controller.url, payload: controller.payload, themeParams: generateWebAppThemeParams(presentationData.theme), fromMenu: controller.fromMenu, replyToMessageId: controller.replyToMessageId)
                 |> deliverOnMainQueue).start(next: { [weak self] result in
                     guard let strongSelf = self else {
                         return
@@ -469,11 +468,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
             let alertController = textAlertController(context: self.context, updatedPresentationData: self.controller?.updatedPresentationData, title: nil, text: message, actions: [TextAlertAction(type: .defaultAction, title: self.presentationData.strings.Common_OK, action: {
                 completionHandler()
             })])
-            alertController.dismissed = { byOutsideTap in
-                if byOutsideTap {
-                    completionHandler()
-                }
-            }
             self.controller?.present(alertController, in: .window(.root))
         }
 
@@ -483,11 +477,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
             }), TextAlertAction(type: .defaultAction, title: self.presentationData.strings.Common_OK, action: {
                 completionHandler(true)
             })])
-            alertController.dismissed = { byOutsideTap in
-                if byOutsideTap {
-                    completionHandler(false)
-                }
-            }
             self.controller?.present(alertController, in: .window(.root))
         }
 
@@ -499,11 +488,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
                     completionHandler(nil)
                 }
             })
-            promptController.dismissed = { byOutsideTap in
-                if byOutsideTap {
-                    completionHandler(nil)
-                }
-            }
             self.controller?.present(promptController, in: .window(.root))
         }
                 
@@ -739,107 +723,10 @@ public final class WebAppController: ViewController, AttachmentContainable {
                         self.headerColorKey = colorKey
                         self.updateHeaderBackgroundColor(transition: .animated(duration: 0.2, curve: .linear))
                     }
-                case "web_app_open_popup":
-                    if let json = json, let message = json["message"] as? String, let buttons = json["buttons"] as? [Any] {
-                        let presentationData = self.presentationData
-                        
-                        let title = json["title"] as? String
-                        var alertButtons: [TextAlertAction] = []
-                        
-                        for buttonJson in buttons {
-                            if let button = buttonJson as? [String: Any], let id = button["id"] as? String, let type = button["type"] as? String {
-                                let buttonAction = {
-                                    self.sendAlertButtonEvent(id: id)
-                                }
-                                let text = button["text"] as? String
-                                switch type {
-                                    case "default":
-                                        if let text = text {
-                                            alertButtons.append(TextAlertAction(type: .genericAction, title: text, action: {
-                                                buttonAction()
-                                            }))
-                                        }
-                                    case "destructive":
-                                        if let text = text {
-                                            alertButtons.append(TextAlertAction(type: .destructiveAction, title: text, action: {
-                                                buttonAction()
-                                            }))
-                                        }
-                                    case "ok":
-                                        alertButtons.append(TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {
-                                            buttonAction()
-                                        }))
-                                    case "cancel":
-                                        alertButtons.append(TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {
-                                            buttonAction()
-                                        }))
-                                    case "close":
-                                        alertButtons.append(TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Close, action: {
-                                            buttonAction()
-                                        }))
-                                    default:
-                                        break
-                                }
-                            }
-                        }
-                        
-                        var actionLayout: TextAlertContentActionLayout = .horizontal
-                        if alertButtons.count > 2 {
-                            actionLayout = .vertical
-                        }
-                        let alertController = textAlertController(context: self.context, updatedPresentationData: self.controller?.updatedPresentationData, title: title, text: message, actions: alertButtons, actionLayout: actionLayout)
-                        alertController.dismissed = { byOutsideTap in
-                            if byOutsideTap {
-                                self.sendAlertButtonEvent(id: nil)
-                            }
-                        }
-                        self.controller?.present(alertController, in: .window(.root))
-                    }
-                case "web_app_setup_closing_behavior":
-                    if let json = json, let needConfirmation = json["need_confirmation"] as? Bool {
-                        self.needDismissConfirmation = needConfirmation
-                    }
-                case "web_app_request_phone":
-                    break
-//                    let _ = (self.context.account.postbox.loadedPeerWithId(self.context.account.peerId)
-//                    |> deliverOnMainQueue).start(next: { [weak self] accountPeer in
-//                        guard let strongSelf = self else {
-//                            return
-//                        }
-//                        guard let user = accountPeer as? TelegramUser, let phoneNumber = user.phone else {
-//                            return
-//                        }
-//
-//                        let actionSheet = ActionSheetController(presentationData: strongSelf.presentationData)
-//                        var items: [ActionSheetItem] = []
-//                        items.append(ActionSheetTextItem(title: strongSelf.presentationData.strings.WebApp_ShareMyPhoneNumberConfirmation(formatPhoneNumber(phoneNumber), strongSelf.controller?.botName ?? "").string, parseMarkdown: true))
-//                        items.append(ActionSheetButtonItem(title: strongSelf.presentationData.strings.WebApp_ShareMyPhoneNumber, action: { [weak actionSheet] in
-//                            actionSheet?.dismissAnimated()
-//                            guard let strongSelf = self else {
-//                                return
-//                            }
-//
-//                            strongSelf.sendPhoneRequestedEvent(phone: phoneNumber)
-//                        }))
-//
-//                        actionSheet.setItemGroups([ActionSheetItemGroup(items: items), ActionSheetItemGroup(items: [
-//                            ActionSheetButtonItem(title: strongSelf.presentationData.strings.Common_Cancel, color: .accent, font: .bold, action: { [weak actionSheet] in
-//                                actionSheet?.dismissAnimated()
-//                                guard let strongSelf = self else {
-//                                    return
-//                                }
-//
-//                                strongSelf.sendPhoneRequestedEvent(phone: nil)
-//                            })
-//                        ])])
-//                        strongSelf.controller?.present(actionSheet, in: .window(.root))
-//                    })
                 default:
                     break
             }
         }
-        
-        fileprivate var needDismissConfirmation = false
         
         private var headerColorKey: String?
         private func updateHeaderBackgroundColor(transition: ContainedViewLayoutTransition) {
@@ -947,22 +834,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
         fileprivate func sendSettingsButtonEvent() {
             self.webView?.sendEvent(name: "settings_button_pressed", data: nil)
         }
-        
-        fileprivate func sendAlertButtonEvent(id: String?) {
-            var paramsString: String?
-            if let id = id {
-                paramsString = "{button_id: \"\(id)\"}"
-            }
-            self.webView?.sendEvent(name: "popup_closed", data: paramsString)
-        }
-        
-        fileprivate func sendPhoneRequestedEvent(phone: String?) {
-            var paramsString: String?
-            if let phone = phone {
-                paramsString = "{phone_number: \"\(phone)\"}"
-            }
-            self.webView?.sendEvent(name: "phone_requested", data: paramsString)
-        }
     }
     
     fileprivate var controllerNode: Node {
@@ -985,7 +856,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
     private let isSimple: Bool
     private let keepAliveSignal: Signal<Never, KeepWebViewError>?
     private let replyToMessageId: MessageId?
-    private let threadId: Int64?
     
     private var presentationData: PresentationData
     fileprivate let updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)?
@@ -995,7 +865,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
     public var getNavigationController: () -> NavigationController? = { return nil }
     public var completion: () -> Void = {}
         
-    public init(context: AccountContext, updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)? = nil, params: WebAppParameters, replyToMessageId: MessageId?, threadId: Int64?) {
+    public init(context: AccountContext, updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)? = nil, params: WebAppParameters, replyToMessageId: MessageId?) {
         self.context = context
         self.peerId = params.peerId
         self.botId = params.botId
@@ -1008,7 +878,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
         self.isSimple = params.isSimple
         self.keepAliveSignal = params.keepAliveSignal
         self.replyToMessageId = replyToMessageId
-        self.threadId = threadId
         
         self.updatedPresentationData = updatedPresentationData
         self.presentationData = updatedPresentationData?.initial ?? context.sharedContext.currentPresentationData.with { $0 }
@@ -1076,9 +945,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
         if case .back = self.cancelButtonNode.state {
             self.controllerNode.sendBackButtonEvent()
         } else {
-            self.requestDismiss {
-                self.dismiss()
-            }
+            self.dismiss()
         }
     }
     
@@ -1094,7 +961,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
         let botId = self.botId
         
         let items = context.engine.messages.attachMenuBots()
-        |> take(1)
         |> map { [weak self] attachMenuBots -> ContextController.Items in
             var items: [ContextMenuItem] = []
             
@@ -1103,8 +969,8 @@ public final class WebAppController: ViewController, AttachmentContainable {
             if self?.url == nil, let attachMenuBot = attachMenuBot, attachMenuBot.hasSettings {
                 items.append(.action(ContextMenuActionItem(text: presentationData.strings.WebApp_Settings, icon: { theme in
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Settings"), color: theme.contextMenu.primaryColor)
-                }, action: { [weak self] c, _ in
-                    c.dismiss(completion: nil)
+                }, action: { [weak self] _, f in
+                    f(.default)
                     
                     if let strongSelf = self {
                         strongSelf.controllerNode.sendSettingsButtonEvent()
@@ -1115,32 +981,20 @@ public final class WebAppController: ViewController, AttachmentContainable {
             if peerId != botId {
                 items.append(.action(ContextMenuActionItem(text: presentationData.strings.WebApp_OpenBot, icon: { theme in
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Bots"), color: theme.contextMenu.primaryColor)
-                }, action: { [weak self] c, _ in
-                    c.dismiss(completion: nil)
+                }, action: { [weak self] _, f in
+                    f(.default)
                     
-                    guard let strongSelf = self else {
-                        return
+                    if let strongSelf = self, let navigationController = strongSelf.getNavigationController() {
+                        strongSelf.dismiss()
+                        strongSelf.context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, context: strongSelf.context, chatLocation: .peer(id: strongSelf.botId)))
                     }
-                    
-                    let _ = (context.engine.data.get(
-                        TelegramEngine.EngineData.Item.Peer.Peer(id: strongSelf.botId)
-                    )
-                    |> deliverOnMainQueue).start(next: { botPeer in
-                        guard let botPeer = botPeer else {
-                            return
-                        }
-                        if let strongSelf = self, let navigationController = strongSelf.getNavigationController() {
-                            strongSelf.dismiss()
-                            strongSelf.context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, context: strongSelf.context, chatLocation: .peer(botPeer)))
-                        }
-                    })
                 })))
             }
             
             items.append(.action(ContextMenuActionItem(text: presentationData.strings.WebApp_ReloadPage, icon: { theme in
                 return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Reload"), color: theme.contextMenu.primaryColor)
-            }, action: { [weak self] c, _ in
-                c.dismiss(completion: nil)
+            }, action: { [weak self] _, f in
+                f(.default)
                 
                 self?.controllerNode.webView?.reload()
             })))
@@ -1148,8 +1002,8 @@ public final class WebAppController: ViewController, AttachmentContainable {
             if let _ = attachMenuBot, self?.url == nil {
                 items.append(.action(ContextMenuActionItem(text: presentationData.strings.WebApp_RemoveBot, textColor: .destructive, icon: { theme in
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Delete"), color: theme.contextMenu.destructiveColor)
-                }, action: { [weak self] c, _ in
-                    c.dismiss(completion: nil)
+                }, action: { [weak self] _, f in
+                    f(.default)
                     
                     if let strongSelf = self {
                         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
@@ -1200,38 +1054,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
     
     public func prepareForReuse() {
         self.updateTabBarAlpha(1.0, .immediate)
-    }
-    
-    public func requestDismiss(completion: @escaping () -> Void) {
-        if self.controllerNode.needDismissConfirmation {
-            let actionSheet = ActionSheetController(presentationData: self.presentationData)
-            actionSheet.setItemGroups([
-                ActionSheetItemGroup(items: [
-                    ActionSheetTextItem(title: self.presentationData.strings.WebApp_CloseConfirmation),
-                    ActionSheetButtonItem(title: self.presentationData.strings.WebApp_CloseAnyway, color: .destructive, action: { [weak actionSheet] in
-                        actionSheet?.dismissAnimated()
-                        
-                        completion()
-                    })
-                ]),
-                ActionSheetItemGroup(items: [
-                    ActionSheetButtonItem(title: self.presentationData.strings.Common_Cancel, color: .accent, font: .bold, action: { [weak actionSheet] in
-                        actionSheet?.dismissAnimated()
-                    })
-                ])
-            ])
-            self.present(actionSheet, in: .window(.root))
-        } else {
-            completion()
-        }
-    }
-    
-    public func shouldDismissImmediately() -> Bool {
-        if self.controllerNode.needDismissConfirmation {
-            return false
-        } else {
-            return true
-        }
     }
 }
 
@@ -1287,13 +1109,11 @@ private final class WebAppContextReferenceContentSource: ContextReferenceContent
     }
 }
 
-public func standaloneWebAppController(context: AccountContext, updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)? = nil, params: WebAppParameters, threadId: Int64?, openUrl: @escaping (String) -> Void, getInputContainerNode: @escaping () -> (CGFloat, ASDisplayNode, () -> AttachmentController.InputPanelTransition?)? = { return nil }, completion: @escaping () -> Void = {}, willDismiss: @escaping () -> Void = {}, didDismiss: @escaping () -> Void = {}, getNavigationController: @escaping () -> NavigationController? = { return nil }, getSourceRect: (() -> CGRect?)? = nil) -> ViewController {
-    let controller = AttachmentController(context: context, updatedPresentationData: updatedPresentationData, chatLocation: .peer(id: params.peerId), buttons: [.standalone], initialButton: .standalone, fromMenu: params.fromMenu, hasTextInput: false, makeEntityInputView: {
-        return nil
-    })
+public func standaloneWebAppController(context: AccountContext, updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)? = nil, params: WebAppParameters, openUrl: @escaping (String) -> Void, getInputContainerNode: @escaping () -> (CGFloat, ASDisplayNode, () -> AttachmentController.InputPanelTransition?)? = { return nil }, completion: @escaping () -> Void = {}, willDismiss: @escaping () -> Void = {}, didDismiss: @escaping () -> Void = {}, getNavigationController: @escaping () -> NavigationController? = { return nil }) -> ViewController {
+    let controller = AttachmentController(context: context, updatedPresentationData: updatedPresentationData, chatLocation: .peer(id: params.peerId), buttons: [.standalone], initialButton: .standalone, fromMenu: params.fromMenu)
     controller.getInputContainerNode = getInputContainerNode
     controller.requestController = { _, present in
-        let webAppController = WebAppController(context: context, updatedPresentationData: updatedPresentationData, params: params, replyToMessageId: nil, threadId: threadId)
+        let webAppController = WebAppController(context: context, updatedPresentationData: updatedPresentationData, params: params, replyToMessageId: nil)
         webAppController.openUrl = openUrl
         webAppController.completion = completion
         webAppController.getNavigationController = getNavigationController
@@ -1301,6 +1121,5 @@ public func standaloneWebAppController(context: AccountContext, updatedPresentat
     }
     controller.willDismiss = willDismiss
     controller.didDismiss = didDismiss
-    controller.getSourceRect = getSourceRect
     return controller
 }

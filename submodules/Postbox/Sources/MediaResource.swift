@@ -8,7 +8,7 @@ public struct MediaResourceId: Equatable, Hashable {
     }
 }
 
-public protocol MediaResource: AnyObject {
+public protocol MediaResource {
     var id: MediaResourceId { get }
     var size: Int64? { get }
     var streamable: Bool { get }

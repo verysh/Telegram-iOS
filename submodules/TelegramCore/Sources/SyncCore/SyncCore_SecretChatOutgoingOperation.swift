@@ -80,7 +80,6 @@ public enum SecretChatSequenceBasedLayer: Int32 {
     case layer46 = 46
     case layer73 = 73
     case layer101 = 101
-    case layer144 = 144
     
     public var secretChatLayer: SecretChatLayer {
         switch self {
@@ -90,8 +89,6 @@ public enum SecretChatSequenceBasedLayer: Int32 {
                 return .layer73
             case .layer101:
                 return .layer101
-            case .layer144:
-                return .layer144
         }
     }
 }

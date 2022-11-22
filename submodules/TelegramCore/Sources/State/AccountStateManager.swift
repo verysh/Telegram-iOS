@@ -100,13 +100,13 @@ public final class AccountStateManager {
         return self.isUpdatingValue.get()
     }
     
-    private let notificationMessagesPipe = ValuePipe<[([Message], PeerGroupId, Bool, MessageHistoryThreadData?)]>()
-    public var notificationMessages: Signal<[([Message], PeerGroupId, Bool, MessageHistoryThreadData?)], NoError> {
+    private let notificationMessagesPipe = ValuePipe<[([Message], PeerGroupId, Bool)]>()
+    public var notificationMessages: Signal<[([Message], PeerGroupId, Bool)], NoError> {
         return self.notificationMessagesPipe.signal()
     }
     
-    private let reactionNotificationsPipe = ValuePipe<[(reactionAuthor: Peer, reaction: MessageReaction.Reaction, message: Message, timestamp: Int32)]>()
-    public var reactionNotifications: Signal<[(reactionAuthor: Peer, reaction: MessageReaction.Reaction, message: Message, timestamp: Int32)], NoError> {
+    private let reactionNotificationsPipe = ValuePipe<[(reactionAuthor: Peer, reaction: String, message: Message, timestamp: Int32)]>()
+    public var reactionNotifications: Signal<[(reactionAuthor: Peer, reaction: String, message: Message, timestamp: Int32)], NoError> {
         return self.reactionNotificationsPipe.signal()
     }
     
@@ -177,7 +177,6 @@ public final class AccountStateManager {
     private let appliedQtsDisposable = MetaDisposable()
     
     var updateConfigRequested: (() -> Void)?
-    var isPremiumUpdated: (() -> Void)?
     
     init(
         accountPeerId: PeerId,
@@ -468,7 +467,7 @@ public final class AccountStateManager {
                                             Logger.shared.log("State", "pollDifference initial state \(authorizedState) != current state \(state.initialState.state)")
                                             return .single((nil, nil, false))
                                         } else {
-                                            return finalStateWithDifference(accountPeerId: accountPeerId, postbox: postbox, network: network, state: state, difference: difference)
+                                            return finalStateWithDifference(postbox: postbox, network: network, state: state, difference: difference)
                                                 |> deliverOn(queue)
                                                 |> mapToSignal { finalState -> Signal<(difference: Api.updates.Difference?, finalStatte: AccountReplayedFinalState?, skipBecauseOfError: Bool), NoError> in
                                                     if !finalState.state.preCachedResources.isEmpty {
@@ -581,7 +580,7 @@ public final class AccountStateManager {
                 let queue = self.queue
                 let signal = initialStateWithUpdateGroups(postbox: postbox, groups: groups)
                 |> mapToSignal { [weak self] state -> Signal<(AccountReplayedFinalState?, AccountFinalState), NoError> in
-                    return finalStateWithUpdateGroups(accountPeerId: accountPeerId, postbox: postbox, network: network, state: state, groups: groups)
+                    return finalStateWithUpdateGroups(postbox: postbox, network: network, state: state, groups: groups)
                     |> deliverOn(queue)
                     |> mapToSignal { finalState in
                         if !finalState.discard && !finalState.state.preCachedResources.isEmpty {
@@ -723,13 +722,12 @@ public final class AccountStateManager {
                     let _ = self.delayNotificatonsUntil.swap(events.delayNotificatonsUntil)
                 }
                 
-                let signal = self.postbox.transaction { transaction -> [([Message], PeerGroupId, Bool, MessageHistoryThreadData?)] in
-                    var messageList: [([Message], PeerGroupId, Bool, MessageHistoryThreadData?)] = []
-                    
+                let signal = self.postbox.transaction { transaction -> [([Message], PeerGroupId, Bool)] in
+                    var messageList: [([Message], PeerGroupId, Bool)] = []
                     for id in events.addedIncomingMessageIds {
-                        let (messages, notify, _, _, threadData) = messagesForNotification(transaction: transaction, id: id, alwaysReturnMessage: false)
+                        let (messages, notify, _, _) = messagesForNotification(transaction: transaction, id: id, alwaysReturnMessage: false)
                         if !messages.isEmpty {
-                            messageList.append((messages, .root, notify, threadData))
+                            messageList.append((messages, .root, notify))
                         }
                     }
                     var wasScheduledMessages: [Message] = []
@@ -739,16 +737,7 @@ public final class AccountStateManager {
                         }
                     }
                     if !wasScheduledMessages.isEmpty {
-                        var threadData: MessageHistoryThreadData?
-                        let first = wasScheduledMessages[0]
-                        for attr in first.attributes {
-                            if let attribute = attr as? ReplyMessageAttribute {
-                                if let threadId = attribute.threadMessageId {
-                                    threadData = transaction.getMessageHistoryThreadInfo(peerId: first.id.peerId, threadId: makeMessageThreadId(threadId))?.data.get(MessageHistoryThreadData.self)
-                                }
-                            }
-                        }
-                        messageList.append((wasScheduledMessages, .root, true, threadData))
+                        messageList.append((wasScheduledMessages, .root, true))
                     }
                     return messageList
                 }
@@ -764,7 +753,7 @@ public final class AccountStateManager {
             
                 let timestamp = Int32(Date().timeIntervalSince1970)
                 let minReactionTimestamp = timestamp - 20
-                let reactionEvents = events.addedReactionEvents.compactMap { event -> (reactionAuthor: Peer, reaction: MessageReaction.Reaction, message: Message, timestamp: Int32)? in
+                let reactionEvents = events.addedReactionEvents.compactMap { event -> (reactionAuthor: Peer, reaction: String, message: Message, timestamp: Int32)? in
                     if event.timestamp >= minReactionTimestamp {
                         return (event.reactionAuthor, event.reaction, event.message, event.timestamp)
                     } else {
@@ -772,6 +761,7 @@ public final class AccountStateManager {
                     }
                 }
                 self.reactionNotificationsPipe.putNext(reactionEvents)
+
             
                 if !events.displayAlerts.isEmpty {
                     self.displayAlertsPipe.putNext(events.displayAlerts)
@@ -795,10 +785,6 @@ public final class AccountStateManager {
             
                 if events.updateConfig {
                     self.updateConfigRequested?()
-                }
-            
-                if events.isPremiumUpdated {
-                    self.isPremiumUpdated?()
                 }
             case let .pollCompletion(pollId, preMessageIds, preSubscribers):
                 if self.operations.count > 1 {
@@ -958,7 +944,7 @@ public final class AccountStateManager {
                                 Logger.shared.log("State", "pollDifference initial state \(authorizedState) != current state \(state.initialState.state)")
                                 return .single((nil, nil, false))
                             } else {
-                                return finalStateWithDifference(accountPeerId: accountPeerId, postbox: postbox, network: network, state: state, difference: difference)
+                                return finalStateWithDifference(postbox: postbox, network: network, state: state, difference: difference)
                                 |> deliverOn(queue)
                                 |> mapToSignal { finalState -> Signal<(difference: Api.updates.Difference?, finalStatte: AccountReplayedFinalState?, skipBecauseOfError: Bool), NoError> in
                                     if !finalState.state.preCachedResources.isEmpty {
@@ -1328,59 +1314,16 @@ public final class AccountStateManager {
     }
 }
 
-func resolveNotificationSettings(list: [TelegramPeerNotificationSettings], defaultSettings: MessageNotificationSettings) -> (sound: PeerMessageSound, notify: Bool, displayContents: Bool) {
-    var sound: PeerMessageSound = defaultSettings.sound
-    
-    var notify = defaultSettings.enabled
-    var displayContents = defaultSettings.displayPreviews
-    
-    for item in list.reversed() {
-        if case .default = item.messageSound {
-        } else {
-            sound = item.messageSound
-        }
-        
-        switch item.displayPreviews {
-        case .default:
-            break
-        case .show:
-            displayContents = true
-        case .hide:
-            displayContents = false
-        }
-        
-        switch item.muteState {
-        case .default:
-            break
-        case .unmuted:
-            notify = true
-        case let .muted(deadline):
-            let timestamp = Int32(CFAbsoluteTimeGetCurrent() + NSTimeIntervalSince1970)
-            if deadline > timestamp {
-                notify = false
-            } else {
-                notify = true
-            }
-        }
-    }
-    
-    if case .default = sound {
-        sound = defaultCloudPeerNotificationSound
-    }
-    
-    return (sound, notify, displayContents)
-}
-
-public func messagesForNotification(transaction: Transaction, id: MessageId, alwaysReturnMessage: Bool) -> (messages: [Message], notify: Bool, sound: PeerMessageSound, displayContents: Bool, threadData: MessageHistoryThreadData?) {
+public func messagesForNotification(transaction: Transaction, id: MessageId, alwaysReturnMessage: Bool) -> (messages: [Message], notify: Bool, sound: PeerMessageSound, displayContents: Bool) {
     guard let message = transaction.getMessage(id) else {
         Logger.shared.log("AccountStateManager", "notification message doesn't exist")
-        return ([], false, defaultCloudPeerNotificationSound, false, nil)
+        return ([], false, defaultCloudPeerNotificationSound, false)
     }
 
     var notify = true
+    var sound: PeerMessageSound = defaultCloudPeerNotificationSound
     var muted = false
     var displayContents = true
-    var threadData: MessageHistoryThreadData?
     
     for attribute in message.attributes {
         if let attribute = attribute as? NotificationInfoMessageAttribute {
@@ -1388,16 +1331,7 @@ public func messagesForNotification(transaction: Transaction, id: MessageId, alw
                 muted = true
             }
         }
-        if let attribute = attribute as? ReplyMessageAttribute {
-            if let threadId = attribute.threadMessageId {
-                threadData = transaction.getMessageHistoryThreadInfo(peerId: message.id.peerId, threadId: makeMessageThreadId(threadId))?.data.get(MessageHistoryThreadData.self)
-            }
-        }
     }
-    if threadData == nil, let threadId = message.threadId {
-        threadData = transaction.getMessageHistoryThreadInfo(peerId: message.id.peerId, threadId: threadId)?.data.get(MessageHistoryThreadData.self)
-    }
-    
     for media in message.media {
         if let action = media as? TelegramMediaAction {
             switch action.action {
@@ -1409,6 +1343,8 @@ public func messagesForNotification(transaction: Transaction, id: MessageId, alw
         }
     }
     
+    let timestamp = Int32(CFAbsoluteTimeGetCurrent() + NSTimeIntervalSince1970)
+    
     var notificationPeerId = id.peerId
     let peer = transaction.getPeer(id.peerId)
     if let peer = peer, let associatedPeerId = peer.associatedPeerId {
@@ -1418,38 +1354,47 @@ public func messagesForNotification(transaction: Transaction, id: MessageId, alw
         notificationPeerId = author.id
     }
     
-    var notificationSettingsStack: [TelegramPeerNotificationSettings] = []
-    
-    if let threadId = message.threadId, let threadData = transaction.getMessageHistoryThreadInfo(peerId: message.id.peerId, threadId: threadId)?.data.get(MessageHistoryThreadData.self) {
-        notificationSettingsStack.append(threadData.notificationSettings)
-    }
-    
-    if let notificationSettings = transaction.getPeerNotificationSettings(id: notificationPeerId) as? TelegramPeerNotificationSettings {
-        notificationSettingsStack.append(notificationSettings)
-    }
-    
-    let globalNotificationSettings = transaction.getPreferencesEntry(key: PreferencesKeys.globalNotifications)?.get(GlobalNotificationSettings.self) ?? GlobalNotificationSettings.defaultSettings
-    
-    let defaultNotificationSettings: MessageNotificationSettings
-    if id.peerId.namespace == Namespaces.Peer.CloudUser {
-        defaultNotificationSettings = globalNotificationSettings.effective.privateChats
-    } else if id.peerId.namespace == Namespaces.Peer.SecretChat {
-        defaultNotificationSettings = globalNotificationSettings.effective.privateChats
-        displayContents = false
-    } else if id.peerId.namespace == Namespaces.Peer.CloudChannel, let peer = peer as? TelegramChannel, case .broadcast = peer.info {
-        defaultNotificationSettings = globalNotificationSettings.effective.channels
+    if let notificationSettings = transaction.getPeerNotificationSettings(notificationPeerId) as? TelegramPeerNotificationSettings {
+        var defaultSound: PeerMessageSound = defaultCloudPeerNotificationSound
+        var defaultNotify: Bool = true
+        if let globalNotificationSettings = transaction.getPreferencesEntry(key: PreferencesKeys.globalNotifications)?.get(GlobalNotificationSettings.self) {
+            if id.peerId.namespace == Namespaces.Peer.CloudUser {
+                defaultNotify = globalNotificationSettings.effective.privateChats.enabled
+                defaultSound = globalNotificationSettings.effective.privateChats.sound
+                displayContents = globalNotificationSettings.effective.privateChats.displayPreviews
+            } else if id.peerId.namespace == Namespaces.Peer.SecretChat {
+                defaultNotify = globalNotificationSettings.effective.privateChats.enabled
+                defaultSound = globalNotificationSettings.effective.privateChats.sound
+                displayContents = false
+            } else if id.peerId.namespace == Namespaces.Peer.CloudChannel, let peer = peer as? TelegramChannel, case .broadcast = peer.info {
+                defaultNotify = globalNotificationSettings.effective.channels.enabled
+                defaultSound = globalNotificationSettings.effective.channels.sound
+                displayContents = globalNotificationSettings.effective.channels.displayPreviews
+            } else {
+                defaultNotify = globalNotificationSettings.effective.groupChats.enabled
+                defaultSound = globalNotificationSettings.effective.groupChats.sound
+                displayContents = globalNotificationSettings.effective.groupChats.displayPreviews
+            }
+        }
+        switch notificationSettings.muteState {
+            case .default:
+                if !defaultNotify {
+                    notify = false
+                }
+            case let .muted(until):
+                if until >= timestamp {
+                    notify = false
+                }
+            case .unmuted:
+                break
+        }
+        if case .default = notificationSettings.messageSound {
+            sound = defaultSound
+        } else {
+            sound = notificationSettings.messageSound
+        }
     } else {
-        defaultNotificationSettings = globalNotificationSettings.effective.groupChats
-    }
-    
-    let (resolvedSound, resolvedNotify, resolvedDisplayContents) = resolveNotificationSettings(list: notificationSettingsStack, defaultSettings: defaultNotificationSettings)
-    
-    var sound = resolvedSound
-    if !resolvedNotify {
-        notify = false
-    }
-    if !resolvedDisplayContents {
-        displayContents = false
+        Logger.shared.log("AccountStateManager", "notification settings for \(notificationPeerId) are undefined")
     }
     
     if muted {
@@ -1458,10 +1403,10 @@ public func messagesForNotification(transaction: Transaction, id: MessageId, alw
     
     if let channel = message.peers[message.id.peerId] as? TelegramChannel {
         switch channel.participationStatus {
-        case .kicked, .left:
-            return ([], false, sound, false, threadData)
-        case .member:
-            break
+            case .kicked, .left:
+                return ([], false, sound, false)
+            case .member:
+                break
         }
     }
     
@@ -1491,8 +1436,8 @@ public func messagesForNotification(transaction: Transaction, id: MessageId, alw
     }
     
     if notify {
-        return (resultMessages, isUnread, sound, displayContents, threadData)
+        return (resultMessages, isUnread, sound, displayContents)
     } else {
-        return (alwaysReturnMessage ? resultMessages : [], false, sound, displayContents, threadData)
+        return (alwaysReturnMessage ? resultMessages : [], false, sound, displayContents)
     }
 }

@@ -5,7 +5,6 @@
 
 #import "NSWeakReference.h"
 
-
 @interface UIViewControllerPresentingProxy : UIViewController
 
 @property (nonatomic, copy) void (^dismiss)();
@@ -140,24 +139,6 @@ static bool notyfyingShiftState = false;
 
 @end
 
-@interface UIWindow (Telegram)
-
-@end
-
-@implementation UIWindow (Telegram)
-
-- (instancetype)_65087dc8_initWithFrame:(CGRect)frame {
-    return [self _65087dc8_initWithFrame:frame];
-}
-
-@end
-
-@protocol UIRemoteKeyboardWindowProtocol
-
-+ (UIWindow * _Nullable)remoteKeyboardWindowForScreen:(UIScreen * _Nullable)screen create:(BOOL)create;
-
-@end
-
 @implementation UIViewController (Navigation)
 
 + (void)load
@@ -173,8 +154,6 @@ static bool notyfyingShiftState = false;
         [RuntimeUtils swizzleInstanceMethodOfClass:[UIViewController class] currentSelector:@selector(presentingViewController) newSelector:@selector(_65087dc8_presentingViewController)];
         [RuntimeUtils swizzleInstanceMethodOfClass:[UIViewController class] currentSelector:@selector(presentViewController:animated:completion:) newSelector:@selector(_65087dc8_presentViewController:animated:completion:)];
         [RuntimeUtils swizzleInstanceMethodOfClass:[UIViewController class] currentSelector:@selector(setNeedsStatusBarAppearanceUpdate) newSelector:@selector(_65087dc8_setNeedsStatusBarAppearanceUpdate)];
-        
-        [RuntimeUtils swizzleInstanceMethodOfClass:[UIWindow class] currentSelector:@selector(initWithFrame:) newSelector:@selector(_65087dc8_initWithFrame:)];
         
         if (@available(iOS 15.0, *)) {
             [RuntimeUtils swizzleInstanceMethodOfClass:[CADisplayLink class] currentSelector:@selector(setPreferredFrameRateRange:) newSelector:@selector(_65087dc8_setPreferredFrameRateRange:)];
@@ -310,15 +289,6 @@ static bool notyfyingShiftState = false;
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
     [self setStatusBarHidden:hidden withAnimation:animation];
 #pragma clang diagnostic pop
-}
-
-- (UIWindow * _Nullable)internalGetKeyboard {
-    Class windowClass = NSClassFromString(@"UIRemoteKeyboardWindow");
-    if (!windowClass) {
-        return nil;
-    }
-    UIWindow *result = [(id<UIRemoteKeyboardWindowProtocol>)windowClass remoteKeyboardWindowForScreen:[UIScreen mainScreen] create:false];
-    return result;
 }
 
 @end

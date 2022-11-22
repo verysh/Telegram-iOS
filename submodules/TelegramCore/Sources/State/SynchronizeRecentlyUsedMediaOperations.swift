@@ -45,6 +45,3 @@ func _internal_clearRecentlyUsedStickers(transaction: Transaction) {
     addSynchronizeRecentlyUsedMediaOperation(transaction: transaction, category: .stickers, operation: .clear)
 }
 
-func _internal_clearRecentlyUsedEmoji(transaction: Transaction) {
-    transaction.replaceOrderedItemListItems(collectionId: Namespaces.OrderedItemList.LocalRecentEmoji, items: [])
-}

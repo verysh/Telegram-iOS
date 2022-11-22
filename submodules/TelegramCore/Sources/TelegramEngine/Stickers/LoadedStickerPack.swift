@@ -10,24 +10,16 @@ extension StickerPackReference {
     
     var apiInputStickerSet: Api.InputStickerSet {
         switch self {
-        case let .id(id, accessHash):
-            return .inputStickerSetID(id: id, accessHash: accessHash)
-        case let .name(name):
-            return .inputStickerSetShortName(shortName: name)
-        case .animatedEmoji:
-            return .inputStickerSetAnimatedEmoji
-        case let .dice(emoji):
-            return .inputStickerSetDice(emoticon: emoji)
-        case .animatedEmojiAnimations:
-            return .inputStickerSetAnimatedEmojiAnimations
-        case .premiumGifts:
-            return .inputStickerSetPremiumGifts
-        case .emojiGenericAnimations:
-            return .inputStickerSetEmojiGenericAnimations
-        case .iconStatusEmoji:
-            return .inputStickerSetEmojiDefaultStatuses
-        case .iconTopicEmoji:
-            return .inputStickerSetEmojiDefaultTopicIcons
+            case let .id(id, accessHash):
+                return .inputStickerSetID(id: id, accessHash: accessHash)
+            case let .name(name):
+                return .inputStickerSetShortName(shortName: name)
+            case .animatedEmoji:
+                return .inputStickerSetAnimatedEmoji
+            case let .dice(emoji):
+                return .inputStickerSetDice(emoticon: emoji)
+            case .animatedEmojiAnimations:
+                return .inputStickerSetAnimatedEmojiAnimations
         }
     }
 }
@@ -54,14 +46,12 @@ func updatedRemoteStickerPack(postbox: Postbox, network: Network, reference: Sti
             switch result {
             case .stickerSetNotModified:
                 return .complete()
-            case let .stickerSet(set, packs, keywords, documents):
+            case let .stickerSet(set, packs, documents):
                 let namespace: ItemCollectionId.Namespace
                 switch set {
-                    case let .stickerSet(flags, _, _, _, _, _, _, _, _, _, _, _):
+                    case let .stickerSet(flags, _, _, _, _, _, _, _, _, _, _):
                         if (flags & (1 << 3)) != 0 {
                             namespace = Namespaces.ItemCollection.CloudMaskPacks
-                        } else if (flags & (1 << 7)) != 0 {
-                            namespace = Namespaces.ItemCollection.CloudEmojiPacks
                         } else {
                             namespace = Namespaces.ItemCollection.CloudStickerPacks
                         }
@@ -80,20 +70,6 @@ func updatedRemoteStickerPack(postbox: Postbox, network: Network, reference: Sti
                                     indexKeysByFile[mediaId]!.append(key)
                                 }
                             }
-                    }
-                }
-                for keyword in keywords {
-                    switch keyword {
-                    case let .stickerKeyword(documentId, texts):
-                        for text in texts {
-                            let key = ValueBoxKey(text).toMemoryBuffer()
-                            let mediaId = MediaId(namespace: Namespaces.Media.CloudFile, id: documentId)
-                            if indexKeysByFile[mediaId] == nil {
-                                indexKeysByFile[mediaId] = [key]
-                            } else {
-                                indexKeysByFile[mediaId]!.append(key)
-                            }
-                        }
                     }
                 }
                 

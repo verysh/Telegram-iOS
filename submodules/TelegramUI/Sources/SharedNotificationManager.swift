@@ -464,10 +464,16 @@ public final class SharedNotificationManager {
                 
             } else {
                 let notification = UILocalNotification()
-                
-                notification.alertTitle = title
-                notification.alertBody = body
-                
+                if #available(iOS 8.2, *) {
+                    notification.alertTitle = title
+                    notification.alertBody = body
+                } else {
+                    if let title = title {
+                        notification.alertBody = "\(title): \(body)"
+                    } else {
+                        notification.alertBody = body
+                    }
+                }
                 notification.category = "incomingCall"
                 notification.userInfo = ["callId": String(describing: notificationCall.internalId)]
                 notification.soundName = "0.m4a"

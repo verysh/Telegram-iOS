@@ -72,8 +72,6 @@ func managedSynchronizeInstalledStickerPacksOperations(postbox: Postbox, network
                 tag = OperationLogTags.SynchronizeInstalledStickerPacks
             case .masks:
                 tag = OperationLogTags.SynchronizeInstalledMasks
-            case .emoji:
-                tag = OperationLogTags.SynchronizeInstalledEmoji
         }
         
         let helper = Atomic<ManagedSynchronizeInstalledStickerPacksOperationsHelper>(value: ManagedSynchronizeInstalledStickerPacksOperationsHelper())
@@ -128,7 +126,7 @@ private func hashForStickerPackInfos(_ infos: [StickerPackCollectionInfo]) -> In
     var acc: UInt64 = 0
     
     for info in infos {
-        combineInt64Hash(&acc, with: UInt64(bitPattern: Int64(info.hash)))
+        combineInt64Hash(&acc, with: UInt64(UInt32(bitPattern: info.hash)))
     }
     
     return finalizeInt64Hash(acc)
@@ -147,7 +145,7 @@ private func fetchStickerPack(network: Network, info: StickerPackCollectionInfo)
         switch result {
         case .stickerSetNotModified:
             break
-        case let .stickerSet(stickerSet, packs, keywords, documents):
+        case let .stickerSet(stickerSet, packs, documents):
             updatedInfo = StickerPackCollectionInfo(apiSet: stickerSet, namespace: info.id.namespace)
             var indexKeysByFile: [MediaId: [MemoryBuffer]] = [:]
             for pack in packs {
@@ -163,20 +161,6 @@ private func fetchStickerPack(network: Network, info: StickerPackCollectionInfo)
                         }
                     }
                     break
-                }
-            }
-            for keyword in keywords {
-                switch keyword {
-                case let .stickerKeyword(documentId, texts):
-                    for text in texts {
-                        let key = ValueBoxKey(text).toMemoryBuffer()
-                        let mediaId = MediaId(namespace: Namespaces.Media.CloudFile, id: documentId)
-                        if indexKeysByFile[mediaId] == nil {
-                            indexKeysByFile[mediaId] = [key]
-                        } else {
-                            indexKeysByFile[mediaId]!.append(key)
-                        }
-                    }
                 }
             }
             
@@ -234,12 +218,10 @@ private func installRemoteStickerPacks(network: Network, infos: [StickerPackColl
                         var archivedIds = Set<ItemCollectionId>()
                         for archivedSet in archivedSets {
                             switch archivedSet {
-                            case let .stickerSetCovered(set, _):
-                                archivedIds.insert(StickerPackCollectionInfo(apiSet: set, namespace: info.id.namespace).id)
-                            case let .stickerSetMultiCovered(set, _):
-                                archivedIds.insert(StickerPackCollectionInfo(apiSet: set, namespace: info.id.namespace).id)
-                            case let .stickerSetFullCovered(set, _, _, _):
-                                archivedIds.insert(StickerPackCollectionInfo(apiSet: set, namespace: info.id.namespace).id)
+                                case let .stickerSetCovered(set, _):
+                                    archivedIds.insert(StickerPackCollectionInfo(apiSet: set, namespace: info.id.namespace).id)
+                                case let .stickerSetMultiCovered(set, _):
+                                    archivedIds.insert(StickerPackCollectionInfo(apiSet: set, namespace: info.id.namespace).id)
                             }
                         }
                         return archivedIds
@@ -313,8 +295,6 @@ private func reorderRemoteStickerPacks(network: Network, namespace: SynchronizeI
             break
         case .masks:
             flags |= (1 << 0)
-        case .emoji:
-            flags |= (1 << 1)
     }
     return network.request(Api.functions.messages.reorderStickerSets(flags: flags, order: ids.map { $0.id }))
         |> `catch` { _ -> Signal<Api.Bool, NoError> in
@@ -332,8 +312,6 @@ private func synchronizeInstalledStickerPacks(transaction: Transaction, postbox:
             collectionNamespace = Namespaces.ItemCollection.CloudStickerPacks
         case .masks:
             collectionNamespace = Namespaces.ItemCollection.CloudMaskPacks
-        case .emoji:
-            collectionNamespace = Namespaces.ItemCollection.CloudEmojiPacks
     }
     
     let localCollectionInfos = transaction.getItemCollectionsInfos(namespace: collectionNamespace).map { $0.1 as! StickerPackCollectionInfo }
@@ -457,8 +435,6 @@ private func continueSynchronizeInstalledStickerPacks(transaction: Transaction, 
             collectionNamespace = Namespaces.ItemCollection.CloudStickerPacks
         case .masks:
             collectionNamespace = Namespaces.ItemCollection.CloudMaskPacks
-        case .emoji:
-            collectionNamespace = Namespaces.ItemCollection.CloudEmojiPacks
     }
     
     let localCollectionInfos = transaction.getItemCollectionsInfos(namespace: collectionNamespace).map { $0.1 as! StickerPackCollectionInfo }
@@ -470,8 +446,6 @@ private func continueSynchronizeInstalledStickerPacks(transaction: Transaction, 
             request = network.request(Api.functions.messages.getAllStickers(hash: initialLocalHash))
         case .masks:
             request = network.request(Api.functions.messages.getMaskStickers(hash: initialLocalHash))
-        case .emoji:
-            request = network.request(Api.functions.messages.getEmojiStickers(hash: initialLocalHash))
     }
     
     let sequence = request

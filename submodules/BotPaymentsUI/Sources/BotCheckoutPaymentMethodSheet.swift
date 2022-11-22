@@ -17,7 +17,6 @@ enum BotCheckoutPaymentMethod: Equatable {
     case savedCredentials(BotPaymentSavedCredentials)
     case webToken(BotCheckoutPaymentWebToken)
     case applePay
-    case other(BotPaymentMethod)
     
     var title: String {
         switch self {
@@ -30,8 +29,6 @@ enum BotCheckoutPaymentMethod: Equatable {
                 return token.title
             case .applePay:
                 return "Apple Pay"
-            case let .other(method):
-                return method.title
         }
     }
 }
@@ -39,7 +36,7 @@ enum BotCheckoutPaymentMethod: Equatable {
 final class BotCheckoutPaymentMethodSheetController: ActionSheetController {
     private var presentationDisposable: Disposable?
     
-    init(context: AccountContext, currentMethod: BotCheckoutPaymentMethod?, methods: [BotCheckoutPaymentMethod], applyValue: @escaping (BotCheckoutPaymentMethod) -> Void, newCard: @escaping () -> Void, otherMethod: @escaping (String) -> Void) {
+    init(context: AccountContext, currentMethod: BotCheckoutPaymentMethod?, methods: [BotCheckoutPaymentMethod], applyValue: @escaping (BotCheckoutPaymentMethod) -> Void, newCard: @escaping () -> Void) {
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
         let strings = presentationData.strings
         
@@ -71,9 +68,6 @@ final class BotCheckoutPaymentMethodSheetController: ActionSheetController {
                 case .applePay:
                     title = "Apple Pay"
                     icon = UIImage(bundleImageName: "Bot Payments/ApplePayLogo")?.precomposed()
-                case let .other(method):
-                    title = method.title
-                    icon = nil
             }
             let value: Bool?
             if let currentMethod = currentMethod {
@@ -82,11 +76,7 @@ final class BotCheckoutPaymentMethodSheetController: ActionSheetController {
                 value = nil
             }
             items.append(BotCheckoutPaymentMethodItem(title: title, icon: icon, value: value, action: { [weak self] _ in
-                if case let .other(method) = method {
-                    otherMethod(method.url)
-                } else {
-                    applyValue(method)
-                }
+                applyValue(method)
                 self?.dismissAnimated()
             }))
         }

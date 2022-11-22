@@ -85,20 +85,12 @@ private final class WindowRootViewController: UIViewController, UIViewController
         didSet {
             if oldValue != self.orientations {
                 if self.orientations == .portrait {
-                    if #available(iOSApplicationExtension 16.0, iOS 16.0, *) {
-                        let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
-                        windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
-                        self.setNeedsUpdateOfSupportedInterfaceOrientations()
-                    } else if UIDevice.current.orientation != .portrait {
+                    if UIDevice.current.orientation != .portrait {
                         let value = UIInterfaceOrientation.portrait.rawValue
                         UIDevice.current.setValue(value, forKey: "orientation")
                     }
                 } else {
-                    if #available(iOSApplicationExtension 16.0, iOS 16.0, *) {
-                        self.setNeedsUpdateOfSupportedInterfaceOrientations()
-                    } else {
-                        UIViewController.attemptRotationToDeviceOrientation()
-                    }
+                    UIViewController.attemptRotationToDeviceOrientation()
                 }
             }
         }

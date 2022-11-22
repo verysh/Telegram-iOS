@@ -13,12 +13,6 @@ import PasscodeInputFieldNode
 import MonotonicTime
 import GradientBackground
 
-private extension CGRect {
-    var center: CGPoint {
-        return CGPoint(x: self.midX, y: self.midY)
-    }
-}
-
 private let titleFont = Font.regular(20.0)
 private let subtitleFont = Font.regular(15.0)
 private let buttonFont = Font.regular(17.0)

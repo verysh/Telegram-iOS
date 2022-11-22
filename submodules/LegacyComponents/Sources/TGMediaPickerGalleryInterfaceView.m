@@ -333,12 +333,6 @@
             if (strongSelf == nil)
                 return;
             
-            if (keyboardHeight > 0) {
-                [strongSelf->_portraitToolbarView setAllButtonsHidden:true animated:true];
-            } else {
-                [strongSelf->_portraitToolbarView setAllButtonsHidden:false animated:true];
-            }
-            
             CGFloat offset = 0.0f;
             if (keyboardHeight > 0)
                 offset = -keyboardHeight / 2.0f;
@@ -1644,7 +1638,7 @@
     
     UIEdgeInsets captionEdgeInsets = screenEdges;
     captionEdgeInsets.bottom = _portraitToolbarView.frame.size.height;
-    [_captionMixin updateLayoutWithFrame:self.bounds edgeInsets:captionEdgeInsets animated:false];
+    [_captionMixin updateLayoutWithFrame:self.bounds edgeInsets:captionEdgeInsets];
     
     switch (orientation)
     {
